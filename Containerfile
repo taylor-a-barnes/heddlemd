@@ -47,6 +47,18 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
                           pandas \
                           jupyter
 
+# Install OpenMM for benchmarking. The PyPI `openmm` wheel ships only the
+# Reference and CPU platforms; the CUDA platform plugin lives in a separate
+# wheel. We use the CUDA 12 build (`openmm-cuda-12`) because the matching
+# CUDA 11.x plugin (openmm-cuda 8.1.1.11.8) only exists for OpenMM 8.1.1 and
+# requires numpy<2, which conflicts with the rest of this image. The CUDA 12
+# wheel bundles its own CUDA runtime libraries via the `nvidia-cuda-*-cu12`
+# packages, so it runs on this CUDA 11.8 base image as long as the host
+# NVIDIA driver is recent enough to support CUDA 12 (>=525).
+RUN python -m pip install \
+                          openmm==8.5.2 \
+                          openmm-cuda-12==8.5.2
+
 
 
 ENV PATH="$PATH:/root/.local/bin"
