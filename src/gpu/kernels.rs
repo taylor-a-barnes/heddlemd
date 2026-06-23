@@ -2110,6 +2110,329 @@ pub fn sort_cells_by_particle_id(
     Ok(())
 }
 
+// rq-be571c62 / rq-d8de5e38 — Tile-based pair-force architecture
+// host launchers (see `rqm/forces/tile-based-pair-force.md`). Runs
+// the four-stage tile-pair construction pipeline: tile metadata,
+// candidate counts, prefix-scan offsets, candidate emission.
+//
+// The host helper allocates a scratch scan-block-totals stack
+// inline; the scan stack is small (a few hundred bytes) and the
+// allocation cost is amortised by cudarc's allocator pool. The
+// returned `u32` is the total number of (i_tile, j_tile) entries
+// emitted into `tile_pair_list`.
+#[allow(clippy::too_many_arguments)]
+/// rq-b7601928 — Refresh the tile-sorted position view from the
+/// current `positions_*` arrays. Runs every step at the start of
+/// `ForceField::step()` (see `rqm/forces/tile-based-pair-force.md`,
+/// *Tile-Sorted Position Scatter*).
+///
+/// One thread per atom; block size 256, grid `ceil(N / 256)`.
+#[allow(clippy::too_many_arguments)]
+pub fn scatter_positions_to_tile_order(
+    kernels: &Kernels,
+    particle_buffers: &ParticleBuffers,
+    sorted_particle_ids: &CudaSlice<u32>,
+    tile_sorted_positions_x: &mut CudaSlice<Real>,
+    tile_sorted_positions_y: &mut CudaSlice<Real>,
+    tile_sorted_positions_z: &mut CudaSlice<Real>,
+) -> Result<(), GpuError> {
+    let n = particle_buffers.particle_count();
+    if n == 0 {
+        return Ok(());
+    }
+    let n_u32 = n as u32;
+    let func = kernels.neighbor.scatter_positions_to_tile_order.clone();
+    let cfg = launch_config(n_u32);
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                &particle_buffers.positions_x,
+                &particle_buffers.positions_y,
+                &particle_buffers.positions_z,
+                sorted_particle_ids,
+                &mut *tile_sorted_positions_x,
+                &mut *tile_sorted_positions_y,
+                &mut *tile_sorted_positions_z,
+                n_u32,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+pub fn launch_tile_construction(
+    kernels: &Kernels,
+    particle_buffers: &ParticleBuffers,
+    sim_box: &crate::pbc::SimulationBox,
+    sorted_particle_ids: &CudaSlice<u32>,
+    cell_indices: &CudaSlice<u32>,
+    cell_offsets: &CudaSlice<u32>,
+    n_cells: [u32; 3],
+    r_search_sq: Real,
+    n: u32,
+    n_tiles: u32,
+    tile_atom_count: &mut CudaSlice<u32>,
+    tile_lane_mask: &mut CudaSlice<u32>,
+    tile_bboxes: &mut CudaSlice<Real>,
+    tile_candidate_counts: &mut CudaSlice<u32>,
+    tile_pair_offsets: &mut CudaSlice<u32>,
+    tile_pair_list: &mut CudaSlice<u32>,
+    tile_pair_masks: &mut CudaSlice<u32>,
+    tile_pair_capacity: u32,
+) -> Result<u32, GpuError> {
+    if n_tiles == 0 || n == 0 {
+        return Ok(0);
+    }
+    let device = sorted_particle_ids.device();
+
+    // Debug bisect gate — set HEDDLE_TILE_DEBUG=N to enable stages
+    // 1..N only (0 = none, default = 4 = all). Useful for isolating
+    // a regression in one of the four construction kernels.
+    // HEDDLE_TILE_VERBOSE=1 enables per-stage tracing prints; off by
+    // default to keep the rebuild path quiet.
+    let debug_stages: u32 = std::env::var("HEDDLE_TILE_DEBUG")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(4);
+    let verbose = std::env::var("HEDDLE_TILE_VERBOSE").is_ok();
+    if verbose {
+        eprintln!(
+            "[tile-debug] launch_tile_construction n={n} n_tiles={n_tiles} stages={debug_stages}"
+        );
+    }
+
+    // Stage 1: compute_tile_metadata. Grid sized to ceil(n_tiles / 256).
+    if debug_stages >= 1 {
+        if verbose { eprintln!("[tile-debug] stage 1: compute_tile_metadata"); }
+        let func = kernels.neighbor.compute_tile_metadata.clone();
+        let block = 256u32;
+        let grid = n_tiles.div_ceil(block);
+        let cfg = LaunchConfig {
+            grid_dim: (grid, 1, 1),
+            block_dim: (block, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        unsafe {
+            func.launch(cfg, (&mut *tile_atom_count, &mut *tile_lane_mask, n, n_tiles))
+                .map_err(GpuError::from)?;
+        }
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 1 done"); }
+    }
+
+    let bitmask_words = n_tiles.div_ceil(32);
+    let bitmask_bytes = bitmask_words * std::mem::size_of::<u32>() as u32;
+    let lattice = sim_box.lattice_device();
+
+    // Stage 1b: compute_tile_bounding_boxes. One block per tile,
+    // 32 threads per block, no shared memory (warp shuffle
+    // reduction). Runs as part of stage 1 (no extra debug-gate
+    // level).
+    if debug_stages >= 1 {
+        if verbose { eprintln!("[tile-debug] stage 1b: compute_tile_bounding_boxes"); }
+        let func = kernels.neighbor.compute_tile_bounding_boxes.clone();
+        let cfg = LaunchConfig {
+            grid_dim: (n_tiles, 1, 1),
+            block_dim: (32, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        unsafe {
+            func.launch(
+                cfg,
+                (
+                    &particle_buffers.positions_x,
+                    &particle_buffers.positions_y,
+                    &particle_buffers.positions_z,
+                    sorted_particle_ids,
+                    &mut *tile_bboxes,
+                    n,
+                    n_tiles,
+                ),
+            )
+            .map_err(GpuError::from)?;
+        }
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 1b done"); }
+    }
+
+    // Stage 2: tile_pair_candidate_count.
+    if debug_stages >= 2 {
+        if verbose {
+            eprintln!(
+                "[tile-debug] stage 2: tile_pair_candidate_count (n_cells={:?} bitmask_words={})",
+                n_cells, bitmask_words
+            );
+        }
+        let func = kernels.neighbor.tile_pair_candidate_count.clone();
+        let cfg = LaunchConfig {
+            grid_dim: (n_tiles, 1, 1),
+            block_dim: (32, 1, 1),
+            shared_mem_bytes: bitmask_bytes,
+        };
+        unsafe {
+            func.launch(
+                cfg,
+                (
+                    sorted_particle_ids,
+                    cell_indices,
+                    cell_offsets,
+                    n_cells[0],
+                    n_cells[1],
+                    n_cells[2],
+                    tile_bboxes as &CudaSlice<Real>,
+                    lattice,
+                    r_search_sq,
+                    &mut *tile_candidate_counts,
+                    n,
+                    n_tiles,
+                    bitmask_words,
+                ),
+            )
+            .map_err(GpuError::from)?;
+        }
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 2 done"); }
+    }
+
+    // Stage 3: exclusive prefix scan + finalize sentinel.
+    let mut tile_pair_count: u32 = 0;
+    if debug_stages >= 3 {
+        if verbose { eprintln!("[tile-debug] stage 3: prefix scan + finalize"); }
+        let scan_stack_lengths =
+            crate::forces::neighbor_list::scan_stack_lengths_for(n_tiles as usize);
+        let mut scan_stack: Vec<CudaSlice<u32>> = Vec::with_capacity(scan_stack_lengths.len());
+        for &len in &scan_stack_lengths {
+            scan_stack.push(
+                device
+                    .alloc_zeros::<u32>(len.max(1))
+                    .map_err(GpuError::from)?,
+            );
+        }
+        prefix_scan_cell_counts(
+            kernels,
+            tile_candidate_counts,
+            tile_pair_offsets,
+            &mut scan_stack,
+            n_tiles as usize,
+            0,
+        )?;
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 3a (scan) done"); }
+
+        // Stage 3b: tile_pair_finalize_offsets.
+        let func = kernels.neighbor.tile_pair_finalize_offsets.clone();
+        let cfg = LaunchConfig {
+            grid_dim: (1, 1, 1),
+            block_dim: (1, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        unsafe {
+            func.launch(
+                cfg,
+                (&mut *tile_pair_offsets, tile_candidate_counts as &CudaSlice<u32>, n_tiles),
+            )
+            .map_err(GpuError::from)?;
+        }
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 3b (finalize) done"); }
+
+        // Read tile_pair_count via a single dtoh of the sentinel slot.
+        let mut host_tail = [0u32; 1];
+        {
+            let slice = tile_pair_offsets.slice((n_tiles as usize)..(n_tiles as usize + 1));
+            device
+                .dtoh_sync_copy_into(&slice, &mut host_tail)
+                .map_err(GpuError::from)?;
+        }
+        tile_pair_count = host_tail[0];
+        if verbose { eprintln!("[tile-debug] tile_pair_count={tile_pair_count}"); }
+    }
+
+    // Stage 4: tile_pair_emit.
+    if debug_stages >= 4 && tile_pair_count > 0 {
+        if tile_pair_count > tile_pair_capacity {
+            panic!(
+                "tile_pair_list overflow: tile_pair_count={} > capacity={}; \
+                 increase TILE_PAIR_INITIAL_CAPACITY_PER_TILE or implement grow-on-overflow",
+                tile_pair_count, tile_pair_capacity
+            );
+        }
+        if verbose { eprintln!("[tile-debug] stage 4: tile_pair_emit"); }
+        let func = kernels.neighbor.tile_pair_emit.clone();
+        let cfg = LaunchConfig {
+            grid_dim: (n_tiles, 1, 1),
+            block_dim: (32, 1, 1),
+            shared_mem_bytes: bitmask_bytes,
+        };
+        unsafe {
+            func.launch(
+                cfg,
+                (
+                    sorted_particle_ids,
+                    cell_indices,
+                    cell_offsets,
+                    n_cells[0],
+                    n_cells[1],
+                    n_cells[2],
+                    tile_bboxes as &CudaSlice<Real>,
+                    lattice,
+                    r_search_sq,
+                    tile_pair_offsets as &CudaSlice<u32>,
+                    &mut *tile_pair_list,
+                    n,
+                    n_tiles,
+                    bitmask_words,
+                ),
+            )
+            .map_err(GpuError::from)?;
+        }
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 4 done"); }
+    }
+
+    // Stage 5: compute_tile_pair_masks. One block per i_tile,
+    // MASK_WARPS_PER_BLOCK warps per block (matching the kernel's
+    // expected layout). Cooperative i_tile position cache lives in
+    // statically-sized shared memory (no dynamic shared mem
+    // needed).
+    if debug_stages >= 4 && tile_pair_count > 0 {
+        if verbose { eprintln!("[tile-debug] stage 5: compute_tile_pair_masks"); }
+        const MASK_WARPS_PER_BLOCK: u32 = 8;
+        let func = kernels.neighbor.compute_tile_pair_masks.clone();
+        let cfg = LaunchConfig {
+            grid_dim: (n_tiles, 1, 1),
+            block_dim: (MASK_WARPS_PER_BLOCK * 32, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        unsafe {
+            func.launch(
+                cfg,
+                (
+                    &particle_buffers.positions_x,
+                    &particle_buffers.positions_y,
+                    &particle_buffers.positions_z,
+                    sorted_particle_ids,
+                    tile_pair_offsets as &CudaSlice<u32>,
+                    tile_pair_list as &CudaSlice<u32>,
+                    tile_atom_count as &CudaSlice<u32>,
+                    tile_lane_mask as &CudaSlice<u32>,
+                    lattice,
+                    r_search_sq,
+                    &mut *tile_pair_masks,
+                    n_tiles,
+                ),
+            )
+            .map_err(GpuError::from)?;
+        }
+        device.synchronize().map_err(GpuError::from)?;
+        if verbose { eprintln!("[tile-debug] stage 5 done"); }
+    }
+
+    Ok(tile_pair_count)
+}
+
 // rq-7d5e87ee
 #[cfg(not(feature = "f64"))]
 pub fn vv_kick_drift_lossless(

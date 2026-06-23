@@ -436,7 +436,28 @@ impl AngleTypeConfig {
 #[derive(Debug, Clone, PartialEq)]
 pub enum NeighborListConfig {
     AllPairs,
-    CellList { max_neighbors: u32, r_skin: f64 },
+    CellList {
+        /// Per-particle padded neighbour list capacity. Retained as a
+        /// config field for compatibility with workloads that have
+        /// not migrated to the tile-based architecture; the active
+        /// pair-force pipeline (see
+        /// `rqm/forces/tile-based-pair-force.md`) does not consume
+        /// the per-particle list and ignores this value at runtime.
+        max_neighbors: u32,
+        r_skin: f64,
+        /// rq-d8de5e38 — Initial capacity hint for the tile-pair
+        /// list, in entries per tile. The tile-pair list is sized
+        /// to `N_tiles * tile_pair_initial_capacity_per_tile` at
+        /// construction. Optional; the engine uses an empirical
+        /// default chosen so the first rebuild on liquid-density
+        /// workloads does not trigger a grow.
+        tile_pair_initial_capacity_per_tile: u32,
+        /// rq-d8de5e38 — Multiplier applied when the tile-pair list
+        /// allocation needs to grow because a rebuild produced more
+        /// entries than the current allocation can hold. Must be
+        /// `> 1.0` and `≤ 4.0`. Optional; defaults to `1.5`.
+        tile_pair_growth_factor: f32,
+    },
 }
 
 // CoulombConfig — parsed `[coulomb]` table; rq-846bdb8b
@@ -508,6 +529,12 @@ fn default_spline_order() -> u32 {
 }
 fn default_max_neighbors() -> u32 {
     256
+}
+fn default_tile_pair_initial_capacity_per_tile() -> u32 {
+    256
+}
+fn default_tile_pair_growth_factor() -> f32 {
+    1.5
 }
 fn default_trajectory_every() -> u64 {
     100
@@ -684,6 +711,10 @@ enum RawNeighborList {
         max_neighbors: u32,
         #[serde(default)]
         r_skin: Option<f64>,
+        #[serde(default = "default_tile_pair_initial_capacity_per_tile")]
+        tile_pair_initial_capacity_per_tile: u32,
+        #[serde(default = "default_tile_pair_growth_factor")]
+        tile_pair_growth_factor: f32,
     },
 }
 
@@ -1041,14 +1072,21 @@ fn build_config(
         None => NeighborListConfig::CellList {
             max_neighbors: default_max_neighbors(),
             r_skin: 0.3 * max_cutoff,
+            tile_pair_initial_capacity_per_tile:
+                default_tile_pair_initial_capacity_per_tile(),
+            tile_pair_growth_factor: default_tile_pair_growth_factor(),
         },
         Some(RawNeighborList::AllPairs {}) => NeighborListConfig::AllPairs,
         Some(RawNeighborList::CellList {
             max_neighbors,
             r_skin,
+            tile_pair_initial_capacity_per_tile,
+            tile_pair_growth_factor,
         }) => NeighborListConfig::CellList {
             max_neighbors,
             r_skin: r_skin.map(to_au_length).unwrap_or(0.3 * max_cutoff),
+            tile_pair_initial_capacity_per_tile,
+            tile_pair_growth_factor,
         },
     };
 
@@ -1810,6 +1848,8 @@ fn validate_neighbor_list(n: &NeighborListConfig) -> Result<(), ConfigError> {
         NeighborListConfig::CellList {
             max_neighbors,
             r_skin,
+            tile_pair_initial_capacity_per_tile,
+            tile_pair_growth_factor,
         } => {
             if *max_neighbors == 0 {
                 return Err(invalid(
@@ -1818,6 +1858,21 @@ fn validate_neighbor_list(n: &NeighborListConfig) -> Result<(), ConfigError> {
                 ));
             }
             require_finite_positive("neighbor_list.r_skin", *r_skin)?;
+            if *tile_pair_initial_capacity_per_tile == 0 {
+                return Err(invalid(
+                    "neighbor_list.tile_pair_initial_capacity_per_tile",
+                    "value must be strictly positive",
+                ));
+            }
+            if !tile_pair_growth_factor.is_finite()
+                || *tile_pair_growth_factor <= 1.0
+                || *tile_pair_growth_factor > 4.0
+            {
+                return Err(invalid(
+                    "neighbor_list.tile_pair_growth_factor",
+                    "value must be finite and in (1.0, 4.0]",
+                ));
+            }
             Ok(())
         }
     }

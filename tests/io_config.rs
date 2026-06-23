@@ -1674,7 +1674,9 @@ fn neighbor_list_defaults_to_cell_list_when_section_omitted() {
     let path = write_config(&dir, &minimal_config());
     let cfg = load_config(&path).unwrap();
     match cfg.neighbor_list {
-        NeighborListConfig::CellList { max_neighbors, r_skin } => {
+        NeighborListConfig::CellList {
+            max_neighbors, r_skin, ..
+        } => {
             assert_eq!(max_neighbors, 256);
             // cutoff = 1.0e-9, default r_skin = 0.3 * cutoff = 3.0e-10
             assert!((r_skin - 3.0e-10).abs() < 1.0e-20);
@@ -1695,7 +1697,12 @@ fn neighbor_list_cell_list_explicit_parameters() {
     let cfg = load_config(&path).unwrap();
     assert_eq!(
         cfg.neighbor_list,
-        NeighborListConfig::CellList { max_neighbors: 128, r_skin: 2.0e-10 }
+        NeighborListConfig::CellList {
+            max_neighbors: 128,
+            r_skin: 2.0e-10,
+            tile_pair_initial_capacity_per_tile: 256,
+            tile_pair_growth_factor: 1.5,
+        }
     );
 }
 
@@ -1711,7 +1718,12 @@ fn neighbor_list_cell_list_default_max_neighbors() {
     let cfg = load_config(&path).unwrap();
     assert_eq!(
         cfg.neighbor_list,
-        NeighborListConfig::CellList { max_neighbors: 256, r_skin: 2.0e-10 }
+        NeighborListConfig::CellList {
+            max_neighbors: 256,
+            r_skin: 2.0e-10,
+            tile_pair_initial_capacity_per_tile: 256,
+            tile_pair_growth_factor: 1.5,
+        }
     );
 }
 
@@ -1726,7 +1738,9 @@ fn neighbor_list_cell_list_default_r_skin() {
     let path = write_config(&dir, &body);
     let cfg = load_config(&path).unwrap();
     match cfg.neighbor_list {
-        NeighborListConfig::CellList { max_neighbors, r_skin } => {
+        NeighborListConfig::CellList {
+            max_neighbors, r_skin, ..
+        } => {
             assert_eq!(max_neighbors, 128);
             assert!((r_skin - 3.0e-10).abs() < 1.0e-20);
         }

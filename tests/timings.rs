@@ -568,6 +568,7 @@ fn rows_appear_in_documented_order() {
     let expected = vec![
         "vv_kick_drift",
         "class_accumulator_memset",
+        "scatter_positions_to_tile_order",
         "jit_composed_pair_force",
         "jit_composed_post_force",
         "combine_class_totals",

@@ -18,7 +18,8 @@ pub use graph::{
 pub use kernels::{
     K_COULOMB_F32, LennardJonesParameterTable, SPATIAL_HASH_SCAN_BLOCK_SIZE,
     andersen_resample, berendsen_compute_factor, berendsen_compute_mu,
-    c_rescale_compute_mu, combine_class_totals,
+    c_rescale_compute_mu, combine_class_totals, launch_tile_construction,
+    scatter_positions_to_tile_order,
     compute_cell_indices_and_histogram,
     compute_kinetic_energy, compute_kinetic_energy_on_device,
     compute_total_potential_energy, compute_total_virial,

@@ -473,12 +473,12 @@ impl JitComposedPairForce {
     /// dispatch is responsible for that invariant.
     pub unsafe fn launch(
         &self,
-        n: u32,
+        n_tiles: u32,
         use_fev: bool,
         mut builder: PairForceLaunchBuilder,
     ) -> Result<(), GpuError> {
         let cfg = LaunchConfig {
-            grid_dim: (n.div_ceil(WARPS_PER_BLOCK), 1, 1),
+            grid_dim: (n_tiles.div_ceil(WARPS_PER_BLOCK), 1, 1),
             block_dim: (BLOCK_SIZE, 1, 1),
             shared_mem_bytes: 0,
         };
@@ -650,12 +650,15 @@ fn emit_entry_point(
     s.push_str("\nextern \"C\" __global__ void ");
     s.push_str(entry_name);
     s.push_str("(\n");
-    s.push_str("    const Real *positions_x,\n");
-    s.push_str("    const Real *positions_y,\n");
-    s.push_str("    const Real *positions_z,\n");
-    s.push_str("    const unsigned int *neighbor_list,\n");
-    s.push_str("    const unsigned int *neighbor_counts,\n");
-    s.push_str("    unsigned int max_neighbors,\n");
+    s.push_str("    const Real *tile_sorted_positions_x,\n");
+    s.push_str("    const Real *tile_sorted_positions_y,\n");
+    s.push_str("    const Real *tile_sorted_positions_z,\n");
+    s.push_str("    const unsigned int *sorted_particle_ids,\n");
+    s.push_str("    const unsigned int *tile_pair_offsets,\n");
+    s.push_str("    const unsigned int *tile_pair_list,\n");
+    s.push_str("    const unsigned int *tile_pair_masks,\n");
+    s.push_str("    const unsigned int *tile_atom_count,\n");
+    s.push_str("    const unsigned int *tile_lane_mask,\n");
     s.push_str("    const Real *lattice,\n");
     s.push_str("    Real *slot_force_x,\n");
     s.push_str("    Real *slot_force_y,\n");
@@ -676,9 +679,11 @@ fn emit_entry_point(
     s.push_str("    heddle_jit_outer_loop<");
     s.push_str(if write_ev { "true" } else { "false" });
     s.push_str(">(\n");
-    s.push_str("        composite, n, max_neighbors,\n");
-    s.push_str("        positions_x, positions_y, positions_z,\n");
-    s.push_str("        neighbor_list, neighbor_counts,\n");
+    s.push_str("        composite, n,\n");
+    s.push_str("        tile_sorted_positions_x, tile_sorted_positions_y, tile_sorted_positions_z,\n");
+    s.push_str("        sorted_particle_ids,\n");
+    s.push_str("        tile_pair_offsets, tile_pair_list, tile_pair_masks,\n");
+    s.push_str("        tile_atom_count, tile_lane_mask,\n");
     s.push_str("        lattice,\n");
     s.push_str("        slot_force_x, slot_force_y, slot_force_z,\n");
     if write_ev {
@@ -775,17 +780,30 @@ __device__ static inline Real heddle_jit_exclusion_scale(
 }
 "#;
 
+
+/// Tile-based pair-force outer loop. See
+/// `rqm/forces/tile-based-pair-force.md` for the data-model and
+/// kernel-structure rationale. Each warp owns one i_tile and
+/// iterates the i_tile's neighbour-tile sublist; each warp lane
+/// owns one home atom in the i_tile and accumulates its
+/// contributions in registers. After the sublist is exhausted,
+/// each active lane writes its home atom's force / energy / virial
+/// directly to the slot-output buffer — no warp-tree reduction,
+/// no atomic.
 const OUTER_LOOP_TEMPLATE: &str = r#"
 template <bool WriteEv>
 __device__ static inline void heddle_jit_outer_loop(
     const HeddleJitComposedPairFunc &composite,
     unsigned int n,
-    unsigned int max_neighbors,
-    const Real *positions_x,
-    const Real *positions_y,
-    const Real *positions_z,
-    const unsigned int *neighbor_list,
-    const unsigned int *neighbor_counts,
+    const Real *tile_sorted_positions_x,
+    const Real *tile_sorted_positions_y,
+    const Real *tile_sorted_positions_z,
+    const unsigned int *sorted_particle_ids,
+    const unsigned int *tile_pair_offsets,
+    const unsigned int *tile_pair_list,
+    const unsigned int *tile_pair_masks,
+    const unsigned int *tile_atom_count,
+    const unsigned int *tile_lane_mask,
     const Real *lattice,
     Real *slot_force_x,
     Real *slot_force_y,
@@ -798,52 +816,95 @@ __device__ static inline void heddle_jit_outer_loop(
 
   unsigned int warp_id_in_block = threadIdx.x / HEDDLE_JIT_WARP_SIZE;
   unsigned int lane = threadIdx.x & (HEDDLE_JIT_WARP_SIZE - 1u);
-  unsigned int i = blockIdx.x * HEDDLE_JIT_WARPS_PER_BLOCK + warp_id_in_block;
-  if (i >= n) return;
+  unsigned int i_tile = blockIdx.x * HEDDLE_JIT_WARPS_PER_BLOCK + warp_id_in_block;
+  unsigned int n_tiles = (n + 31u) / 32u;
+  if (i_tile >= n_tiles) return;
 
-  unsigned int count = neighbor_counts[i];
-  unsigned int row_base = i * max_neighbors;
-  unsigned int sweep_end =
-      ((count + HEDDLE_JIT_WARP_SIZE - 1u) / HEDDLE_JIT_WARP_SIZE) * HEDDLE_JIT_WARP_SIZE;
+  unsigned int i_mask = tile_lane_mask[i_tile];
+  bool lane_active = ((i_mask >> lane) & 1u) != 0u;
+
+  // Each lane owns one home atom in the i_tile. Positions come
+  // from the tile-sorted view — `tile_sorted_positions_*[i_tile *
+  // 32 + lane]` is a contiguous 32-element span across the warp,
+  // coalesced by the hardware. Particle IDs are still looked up via
+  // `sorted_particle_ids` for use in the per-pair functor's
+  // `evaluate(home_atom_id, j, ...)` call and for the slot-output
+  // write `slot_force_*[home_atom_id]`.
+  unsigned int home_atom_id = 0u;
+  Real pi_x = R(0.0), pi_y = R(0.0), pi_z = R(0.0);
+  if (lane_active) {
+    home_atom_id = sorted_particle_ids[i_tile * 32u + lane];
+    pi_x = tile_sorted_positions_x[i_tile * 32u + lane];
+    pi_y = tile_sorted_positions_y[i_tile * 32u + lane];
+    pi_z = tile_sorted_positions_z[i_tile * 32u + lane];
+  }
 
   Real p_x = R(0.0), p_y = R(0.0), p_z = R(0.0);
   Real p_e = R(0.0), p_w = R(0.0);
 
-  Real pi_x = positions_x[i];
-  Real pi_y = positions_y[i];
-  Real pi_z = positions_z[i];
+  // Per-warp shared-memory cache for the current j_tile's 32 atoms.
+  __shared__ Real j_pos_cache[HEDDLE_JIT_WARPS_PER_BLOCK][32][3];
+  __shared__ unsigned int j_pid_cache[HEDDLE_JIT_WARPS_PER_BLOCK][32];
 
-  for (unsigned int s = 0u; s < sweep_end; s += HEDDLE_JIT_WARP_SIZE) {
-    unsigned int k = s + lane;
-    if (k < count) {
-      unsigned int j = neighbor_list[row_base + k];
-      if (i != j) {
-        Real dx = pi_x - positions_x[j];
-        Real dy = pi_y - positions_y[j];
-        Real dz = pi_z - positions_z[j];
+  unsigned int sublist_start = tile_pair_offsets[i_tile];
+  unsigned int sublist_end = tile_pair_offsets[i_tile + 1u];
+  for (unsigned int s = sublist_start; s < sublist_end; ++s) {
+    unsigned int j_tile = tile_pair_list[s];
+    unsigned int j_mask = tile_pair_masks[s];
+
+    // Cooperative load of j_tile's 32 positions into shared memory.
+    // Each lane reads from the tile-sorted view at
+    // `tile_sorted_positions_*[j_tile * 32 + lane]` — a contiguous
+    // 32-element span across the warp, coalesced by the hardware.
+    // Particle IDs are read from `sorted_particle_ids` for the
+    // per-pair functor calls.
+    // Inactive j-lanes (beyond j_count) skip; their cache slots are
+    // not read by the inner loop (their mask bits are guaranteed
+    // cleared by `compute_tile_pair_masks`).
+    unsigned int j_count = tile_atom_count[j_tile];
+    if (lane < j_count) {
+      unsigned int pid = sorted_particle_ids[j_tile * 32u + lane];
+      j_pid_cache[warp_id_in_block][lane] = pid;
+      j_pos_cache[warp_id_in_block][lane][0] =
+          tile_sorted_positions_x[j_tile * 32u + lane];
+      j_pos_cache[warp_id_in_block][lane][1] =
+          tile_sorted_positions_y[j_tile * 32u + lane];
+      j_pos_cache[warp_id_in_block][lane][2] =
+          tile_sorted_positions_z[j_tile * 32u + lane];
+    }
+    __syncwarp(0xFFFFFFFFu);
+
+    if (lane_active) {
+      bool self_pair = (j_tile == i_tile);
+      // Mask-driven inner loop: iterate only the j-atoms whose
+      // mask bit is set (proved to be within r_search of some
+      // i-atom during construction). The self-pair branch
+      // additionally skips the diagonal m == lane case.
+      unsigned int rem = j_mask;
+      while (rem != 0u) {
+        unsigned int m = (unsigned int) __ffs((int) rem) - 1u;
+        rem &= rem - 1u;
+        if (self_pair && m == lane) continue;
+        unsigned int j = j_pid_cache[warp_id_in_block][m];
+        Real dx = pi_x - j_pos_cache[warp_id_in_block][m][0];
+        Real dy = pi_y - j_pos_cache[warp_id_in_block][m][1];
+        Real dz = pi_z - j_pos_cache[warp_id_in_block][m][2];
         heddle_jit_triclinic_min_image(dx, dy, dz, lx, ly, lz, xy, xz, yz);
         Real r2 = dx * dx + dy * dy + dz * dz;
-        heddle_jit_eval_pair<WriteEv>(composite, r2, i, j, dx, dy, dz,
+        heddle_jit_eval_pair<WriteEv>(composite, r2, home_atom_id, j, dx, dy, dz,
                                        p_x, p_y, p_z, p_e, p_w);
       }
     }
+    __syncwarp(0xFFFFFFFFu);
   }
 
-  p_x = heddle_jit_warp_reduce_sum(p_x);
-  p_y = heddle_jit_warp_reduce_sum(p_y);
-  p_z = heddle_jit_warp_reduce_sum(p_z);
-  if (WriteEv) {
-    p_e = heddle_jit_warp_reduce_sum(p_e);
-    p_w = heddle_jit_warp_reduce_sum(p_w);
-  }
-
-  if (lane == 0u) {
-    slot_force_x[i] += p_x;
-    slot_force_y[i] += p_y;
-    slot_force_z[i] += p_z;
+  if (lane_active) {
+    slot_force_x[home_atom_id] += p_x;
+    slot_force_y[home_atom_id] += p_y;
+    slot_force_z[home_atom_id] += p_z;
     if (WriteEv) {
-      slot_energy[i] += p_e;
-      slot_virial[i] += p_w;
+      slot_energy[home_atom_id] += p_e;
+      slot_virial[home_atom_id] += p_w;
     }
   }
 }

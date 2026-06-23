@@ -87,6 +87,52 @@ pub struct NeighborListState {
     // observed value and re-run their per-rebuild work when the
     // generation advances.
     rebuild_generation: u64,
+
+    // rq-63755598 — Tile-based pair-force architecture buffers. The
+    // active per-step pair-force path still uses
+    // `neighbor_list` / `neighbor_counts` / `max_neighbors`; tile
+    // buffers are populated alongside on every rebuild so the
+    // tile-based composer can be wired through in a follow-up step.
+    // See `rqm/forces/tile-based-pair-force.md`.
+    pub n_tiles: u32,
+    pub tile_atom_count: CudaSlice<u32>,
+    pub tile_lane_mask: CudaSlice<u32>,
+    /// Per-tile axis-aligned bounding box: 6 × Real per tile in
+    /// row-major order `[min_x, min_y, min_z, max_x, max_y, max_z]`.
+    /// Populated by `compute_tile_bounding_boxes` during rebuild;
+    /// read by `tile_pair_candidate_count` / `tile_pair_emit` for
+    /// bounding-box pruning.
+    pub tile_bboxes: CudaSlice<Real>,
+    pub tile_candidate_counts: CudaSlice<u32>,
+    pub tile_pair_offsets: CudaSlice<u32>,
+    pub tile_pair_list: CudaSlice<u32>,
+    /// Per-tile-pair j-atom interaction mask. Indexed parallel to
+    /// `tile_pair_list`: bit `k` of
+    /// `tile_pair_masks[tile_pair_offsets[t] + i]` is set iff the
+    /// j_atom at tile-lane `k` of `tile_pair_list[...]` is within
+    /// `r_cut + r_skin` of at least one atom in i_tile `t`. The
+    /// JIT-composed pair-force kernel uses this to short-circuit
+    /// its per-pair inner loop over j_atoms; see
+    /// `rqm/forces/tile-based-pair-force.md`.
+    pub tile_pair_masks: CudaSlice<u32>,
+    pub tile_pair_capacity: u32,
+    pub tile_pair_count: u32,
+    /// Tile-sorted view of `positions_x`, refreshed at the start of
+    /// every `ForceField::step()` by `scatter_positions_to_tile_order`.
+    /// Semantics:
+    /// `tile_sorted_positions_x[k] = positions_x[sorted_particle_ids[k]]`.
+    /// The JIT-composed pair-force kernel reads positions exclusively
+    /// from these three buffers (coalesced loads). See
+    /// `rqm/forces/tile-based-pair-force.md`.
+    pub tile_sorted_positions_x: CudaSlice<Real>,
+    pub tile_sorted_positions_y: CudaSlice<Real>,
+    pub tile_sorted_positions_z: CudaSlice<Real>,
+    /// Sorted-particle-id view used by the tile-based pair-force
+    /// kernel. In `CellList` mode this is populated by
+    /// `rebuild_tile_data` (copy of the cell-list's sort). In
+    /// `Trivial` mode it is the identity permutation, allocated once
+    /// at construction.
+    pub tile_sorted_particle_ids: CudaSlice<u32>,
 }
 
 impl NeighborListState {
@@ -183,6 +229,8 @@ impl NeighborListState {
             .map_err(GpuError::from)?;
         let overflow_flag = device.alloc_zeros::<u32>(1).map_err(GpuError::from)?;
 
+        let tb = alloc_tile_buffers(&device, particle_count)?;
+
         Ok(NeighborListState {
             device,
             kernels,
@@ -211,6 +259,20 @@ impl NeighborListState {
                 needs_rebuild: true,
             }),
             rebuild_generation: 0,
+            n_tiles: tb.n_tiles,
+            tile_atom_count: tb.tile_atom_count,
+            tile_lane_mask: tb.tile_lane_mask,
+            tile_bboxes: tb.tile_bboxes,
+            tile_candidate_counts: tb.tile_candidate_counts,
+            tile_pair_offsets: tb.tile_pair_offsets,
+            tile_pair_list: tb.tile_pair_list,
+            tile_pair_masks: tb.tile_pair_masks,
+            tile_pair_capacity: tb.tile_pair_capacity,
+            tile_pair_count: 0,
+            tile_sorted_particle_ids: tb.tile_sorted_particle_ids,
+            tile_sorted_positions_x: tb.tile_sorted_positions_x,
+            tile_sorted_positions_y: tb.tile_sorted_positions_y,
+            tile_sorted_positions_z: tb.tile_sorted_positions_z,
         })
     }
 
@@ -273,6 +335,8 @@ impl NeighborListState {
         let disp_sq = device.alloc_zeros::<Real>(0).map_err(GpuError::from)?;
         let overflow_flag = device.alloc_zeros::<u32>(0).map_err(GpuError::from)?;
 
+        let tb = alloc_tile_buffers(&device, particle_count)?;
+
         Ok(NeighborListState {
             device,
             kernels,
@@ -301,6 +365,20 @@ impl NeighborListState {
                 needs_rebuild: true,
             }),
             rebuild_generation: 0,
+            n_tiles: tb.n_tiles,
+            tile_atom_count: tb.tile_atom_count,
+            tile_lane_mask: tb.tile_lane_mask,
+            tile_bboxes: tb.tile_bboxes,
+            tile_candidate_counts: tb.tile_candidate_counts,
+            tile_pair_offsets: tb.tile_pair_offsets,
+            tile_pair_list: tb.tile_pair_list,
+            tile_pair_masks: tb.tile_pair_masks,
+            tile_pair_capacity: tb.tile_pair_capacity,
+            tile_pair_count: 0,
+            tile_sorted_particle_ids: tb.tile_sorted_particle_ids,
+            tile_sorted_positions_x: tb.tile_sorted_positions_x,
+            tile_sorted_positions_y: tb.tile_sorted_positions_y,
+            tile_sorted_positions_z: tb.tile_sorted_positions_z,
         })
     }
 
@@ -338,6 +416,83 @@ impl NeighborListState {
             device.htod_sync_copy(&counts_host).map_err(GpuError::from)?
         };
 
+        let mut tb = alloc_tile_buffers(&device, particle_count)?;
+
+        // Trivial mode: populate the tile data as all-pairs. Each
+        // tile's neighbour sublist contains every other tile (plus
+        // the self-pair). The sorted-id buffer is the identity
+        // permutation. Built host-side and uploaded; Trivial mode is
+        // for tiny test systems so the upload cost is negligible.
+        let n_tiles = tb.n_tiles as usize;
+        if particle_count > 0 {
+            let identity: Vec<u32> = (0..particle_count as u32).collect();
+            device
+                .htod_sync_copy_into(
+                    &identity,
+                    &mut tb.tile_sorted_particle_ids.slice_mut(0..particle_count),
+                )
+                .map_err(GpuError::from)?;
+
+            // tile_atom_count + lane_mask host-side.
+            let tile_counts: Vec<u32> = (0..n_tiles)
+                .map(|t| {
+                    let start = t * 32;
+                    let end = ((t + 1) * 32).min(particle_count);
+                    (end - start) as u32
+                })
+                .collect();
+            let tile_masks: Vec<u32> = tile_counts
+                .iter()
+                .map(|&c| if c == 32 { 0xFFFFFFFFu32 } else { (1u32 << c) - 1 })
+                .collect();
+            device
+                .htod_sync_copy_into(&tile_counts, &mut tb.tile_atom_count)
+                .map_err(GpuError::from)?;
+            device
+                .htod_sync_copy_into(&tile_masks, &mut tb.tile_lane_mask)
+                .map_err(GpuError::from)?;
+
+            // All-pairs tile-pair list: tile t's sublist is [0, 1,
+            // ..., n_tiles - 1] in ascending order (self-pair appears
+            // at position t).
+            let total_pairs = n_tiles * n_tiles;
+            let pair_offsets: Vec<u32> =
+                (0..=n_tiles).map(|t| (t * n_tiles) as u32).collect();
+            let pair_list: Vec<u32> = (0..total_pairs)
+                .map(|idx| (idx % n_tiles) as u32)
+                .collect();
+            device
+                .htod_sync_copy_into(&pair_offsets, &mut tb.tile_pair_offsets)
+                .map_err(GpuError::from)?;
+            // Tile-pair list capacity must fit total_pairs; for tiny
+            // Trivial-mode workloads the default initial capacity
+            // (N_tiles * 256) is plenty for any N_tiles ≤ 256.
+            assert!(
+                total_pairs <= tb.tile_pair_capacity as usize,
+                "Trivial-mode tile-pair list ({total_pairs}) exceeds capacity ({})",
+                tb.tile_pair_capacity
+            );
+            device
+                .htod_sync_copy_into(
+                    &pair_list,
+                    &mut tb.tile_pair_list.slice_mut(0..total_pairs),
+                )
+                .map_err(GpuError::from)?;
+            // Mask for each entry equals the j_tile's lane mask
+            // (all real lanes are candidates in Trivial mode).
+            let pair_masks: Vec<u32> = pair_list
+                .iter()
+                .map(|&j_tile| tile_masks[j_tile as usize])
+                .collect();
+            device
+                .htod_sync_copy_into(
+                    &pair_masks,
+                    &mut tb.tile_pair_masks.slice_mut(0..total_pairs),
+                )
+                .map_err(GpuError::from)?;
+        }
+        let tile_pair_count = (n_tiles * n_tiles) as u32;
+
         Ok(NeighborListState {
             device,
             kernels,
@@ -347,6 +502,20 @@ impl NeighborListState {
             neighbor_counts,
             mode: NeighborListMode::Trivial,
             rebuild_generation: 0,
+            n_tiles: tb.n_tiles,
+            tile_atom_count: tb.tile_atom_count,
+            tile_lane_mask: tb.tile_lane_mask,
+            tile_bboxes: tb.tile_bboxes,
+            tile_candidate_counts: tb.tile_candidate_counts,
+            tile_pair_offsets: tb.tile_pair_offsets,
+            tile_pair_list: tb.tile_pair_list,
+            tile_pair_masks: tb.tile_pair_masks,
+            tile_pair_capacity: tb.tile_pair_capacity,
+            tile_pair_count,
+            tile_sorted_particle_ids: tb.tile_sorted_particle_ids,
+            tile_sorted_positions_x: tb.tile_sorted_positions_x,
+            tile_sorted_positions_y: tb.tile_sorted_positions_y,
+            tile_sorted_positions_z: tb.tile_sorted_positions_z,
         })
     }
 
@@ -576,8 +745,101 @@ impl NeighborListState {
             .kernel_stop(KernelStage::COPY_POSITIONS_INTO_REFERENCE)
             .map_err(map_timings_err)?;
 
+        // rq-d8de5e38 — Tile-based pair-force architecture
+        // (`rqm/forces/tile-based-pair-force.md`).
+        self.rebuild_tile_data(buffers, timings, sim_box)?;
+
+        let cl = match &mut self.mode {
+            NeighborListMode::Trivial => return Ok(()),
+            NeighborListMode::CellList(cl) | NeighborListMode::CellListOnly(cl) => cl,
+        };
         cl.needs_rebuild = false;
         self.rebuild_generation = self.rebuild_generation.wrapping_add(1);
+        Ok(())
+    }
+
+    /// Populate the tile-based neighbour buffers
+    /// (`tile_atom_count`, `tile_lane_mask`, `tile_pair_offsets`,
+    /// `tile_pair_list`). Called from `rebuild_impl` after the
+    /// cell-list sort has produced `sorted_particle_ids` and
+    /// `cell_indices` / `cell_offsets`. The active per-step force
+    /// kernel does not yet consume these buffers; the tile-based
+    /// composer wires through in a follow-up step.
+    pub(crate) fn rebuild_tile_data(
+        &mut self,
+        buffers: &ParticleBuffers,
+        _timings: &mut Timings,
+        sim_box: &SimulationBox,
+    ) -> Result<(), NeighborListError> {
+        use crate::gpu::launch_tile_construction;
+        // Tile-based pair-force construction targets the
+        // pair-force-bearing CellList mode only.
+        let bin_only = !matches!(self.mode, NeighborListMode::CellList(_));
+        if bin_only || self.particle_count == 0 {
+            self.tile_pair_count = 0;
+            return Ok(());
+        }
+        // Split-borrow: cl borrows self.mode immutably; tile_* are
+        // mutable on self. Since `mode` and the tile fields are
+        // disjoint fields of self, this is sound via field-level
+        // borrowing.
+        let NeighborListState {
+            mode,
+            kernels,
+            particle_count,
+            n_tiles,
+            tile_atom_count,
+            tile_lane_mask,
+            tile_bboxes,
+            tile_candidate_counts,
+            tile_pair_offsets,
+            tile_pair_list,
+            tile_pair_masks,
+            tile_pair_capacity,
+            tile_pair_count,
+            tile_sorted_particle_ids,
+            device,
+            ..
+        } = self;
+        let cl = match mode {
+            NeighborListMode::CellList(cl) => cl,
+            _ => unreachable!(),
+        };
+        let new_count = launch_tile_construction(
+            kernels,
+            buffers,
+            sim_box,
+            &cl.sorted_particle_ids,
+            &cl.cell_indices,
+            &cl.cell_offsets,
+            cl.n_cells,
+            cl.r_search_sq,
+            *particle_count as u32,
+            *n_tiles,
+            tile_atom_count,
+            tile_lane_mask,
+            tile_bboxes,
+            tile_candidate_counts,
+            tile_pair_offsets,
+            tile_pair_list,
+            tile_pair_masks,
+            *tile_pair_capacity,
+        )?;
+        *tile_pair_count = new_count;
+        // Mirror the cell-list sort into the tile-based view so the
+        // dispatcher can read a single sorted-id buffer regardless
+        // of mode. Destination is sized for n_tiles * 32 lanes
+        // (padded for the partial last tile); copy only the
+        // particle_count real entries.
+        let n = *particle_count;
+        if n > 0 {
+            device
+                .dtod_copy(
+                    &cl.sorted_particle_ids.slice(0..n),
+                    &mut tile_sorted_particle_ids.slice_mut(0..n),
+                )
+                .map_err(GpuError::from)?;
+        }
         Ok(())
     }
 
@@ -681,6 +943,14 @@ fn check_n_cells_total(n_cells_total: usize) -> Result<(), NeighborListError> {
 // the stack ends with the first level of length 1. Every
 // `prefix_scan_local_blocks` call needs a block-totals output buffer,
 // including the terminal single-block one, so the last length is 1.
+/// Same as `scan_stack_lengths`; re-exported under a less
+/// neighbour-list-specific name so the tile-pair offset scan in
+/// `gpu::kernels` can reuse it without coupling to the cell-list
+/// terminology.
+pub fn scan_stack_lengths_for(n: usize) -> Vec<usize> {
+    scan_stack_lengths(n)
+}
+
 pub(crate) fn scan_stack_lengths(n_cells_total: usize) -> Vec<usize> {
     let block = SPATIAL_HASH_SCAN_BLOCK_SIZE as usize;
     let mut lengths = Vec::new();
@@ -710,6 +980,115 @@ pub(crate) fn alloc_scan_block_totals(
         .collect()
 }
 
+/// Initial capacity hint for the tile-pair list: `N_tiles *
+/// INITIAL_CAPACITY_PER_TILE` entries.
+///
+/// Without bounding-box pruning (the current skeleton-phase
+/// construction kernels enumerate candidate j_tiles purely by
+/// cell-sweep), each tile's neighbour-tile sublist is the UNION of
+/// the 32 home atoms' 27-cell-sweep candidate tiles. For liquid
+/// water at ~100 atoms/nm³ and `r_cut + r_skin ≈ 11 Å` on a
+/// near-cubic box this is empirically ~160 candidate j_tiles per
+/// tile; 256 leaves a 1.6× headroom before a grow would be
+/// required.
+///
+/// Once bounding-box pruning is implemented (rqm/forces/tile-based-
+/// pair-force.md, *Tile-Pair Neighbour List Construction* step 3),
+/// this hint can drop substantially.
+const TILE_PAIR_INITIAL_CAPACITY_PER_TILE: u32 = 256;
+
+/// Allocate the tile-related GPU buffers. Returns
+/// `(n_tiles, tile_atom_count, tile_lane_mask, tile_candidate_counts,
+///   tile_pair_offsets, tile_pair_list, tile_pair_capacity)`.
+///
+/// The tile-pair list is allocated to `N_tiles *
+/// TILE_PAIR_INITIAL_CAPACITY_PER_TILE` entries up front. Rebuilds
+/// that exceed this capacity grow the buffer; the grow logic lives
+/// in `NeighborListState::rebuild`.
+pub(crate) struct TileBuffers {
+    pub n_tiles: u32,
+    pub tile_atom_count: CudaSlice<u32>,
+    pub tile_lane_mask: CudaSlice<u32>,
+    pub tile_bboxes: CudaSlice<Real>,
+    pub tile_candidate_counts: CudaSlice<u32>,
+    pub tile_pair_offsets: CudaSlice<u32>,
+    pub tile_pair_list: CudaSlice<u32>,
+    pub tile_pair_masks: CudaSlice<u32>,
+    pub tile_pair_capacity: u32,
+    pub tile_sorted_particle_ids: CudaSlice<u32>,
+    pub tile_sorted_positions_x: CudaSlice<Real>,
+    pub tile_sorted_positions_y: CudaSlice<Real>,
+    pub tile_sorted_positions_z: CudaSlice<Real>,
+}
+
+pub(crate) fn alloc_tile_buffers(
+    device: &Arc<CudaDevice>,
+    particle_count: usize,
+) -> Result<TileBuffers, NeighborListError> {
+    let n_tiles = particle_count.div_ceil(32) as u32;
+    let n_tiles_alloc = n_tiles.max(1) as usize;
+    let tile_atom_count = device
+        .alloc_zeros::<u32>(n_tiles_alloc)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_lane_mask = device
+        .alloc_zeros::<u32>(n_tiles_alloc)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_bboxes = device
+        .alloc_zeros::<Real>(6 * n_tiles_alloc)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_candidate_counts = device
+        .alloc_zeros::<u32>(n_tiles_alloc)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_pair_offsets = device
+        .alloc_zeros::<u32>(n_tiles_alloc + 1)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_pair_capacity = n_tiles
+        .saturating_mul(TILE_PAIR_INITIAL_CAPACITY_PER_TILE)
+        .max(1);
+    let tile_pair_list = device
+        .alloc_zeros::<u32>(tile_pair_capacity as usize)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_pair_masks = device
+        .alloc_zeros::<u32>(tile_pair_capacity as usize)
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    // Allocate sorted_particle_ids large enough to address every
+    // tile lane (including the partial last tile's inactive lanes).
+    // The kernel never reads inactive lanes' entries; zero-init is
+    // sufficient.
+    let tile_sorted_particle_ids = device
+        .alloc_zeros::<u32>((n_tiles_alloc * 32).max(1))
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    // tile_sorted_positions_* mirror positions in tile-sort order
+    // (one entry per atom; no padding for partial last tile because
+    // the pair-force kernel reads them only for active lanes via
+    // `tile_sorted_positions_*[i_tile * 32 + lane]` where the lane
+    // is gated by `tile_lane_mask`).
+    let tile_sorted_positions_x = device
+        .alloc_zeros::<Real>(particle_count.max(1))
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_sorted_positions_y = device
+        .alloc_zeros::<Real>(particle_count.max(1))
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    let tile_sorted_positions_z = device
+        .alloc_zeros::<Real>(particle_count.max(1))
+        .map_err(|e| NeighborListError::Gpu(GpuError::from(e)))?;
+    Ok(TileBuffers {
+        n_tiles,
+        tile_atom_count,
+        tile_lane_mask,
+        tile_bboxes,
+        tile_candidate_counts,
+        tile_pair_offsets,
+        tile_pair_list,
+        tile_pair_masks,
+        tile_pair_capacity,
+        tile_sorted_particle_ids,
+        tile_sorted_positions_x,
+        tile_sorted_positions_y,
+        tile_sorted_positions_z,
+    })
+}
+
 fn map_timings_err(e: crate::timings::TimingsError) -> NeighborListError {
     match e {
         crate::timings::TimingsError::Gpu(g) => NeighborListError::Gpu(g),
@@ -728,6 +1107,14 @@ pub struct NeighborKernels {
     pub prefix_scan_finalize_offsets: CudaFunction,
     pub scatter_atoms_into_cells: CudaFunction,
     pub sort_cells_by_particle_id: CudaFunction,
+    // rq-be571c62 / rq-d8de5e38 — tile-based construction kernels.
+    pub compute_tile_metadata: CudaFunction,
+    pub compute_tile_bounding_boxes: CudaFunction,
+    pub tile_pair_candidate_count: CudaFunction,
+    pub tile_pair_finalize_offsets: CudaFunction,
+    pub tile_pair_emit: CudaFunction,
+    pub compute_tile_pair_masks: CudaFunction,
+    pub scatter_positions_to_tile_order: CudaFunction,
 }
 
 impl NeighborKernels {
@@ -745,6 +1132,13 @@ impl NeighborKernels {
                 "prefix_scan_finalize_offsets",
                 "scatter_atoms_into_cells",
                 "sort_cells_by_particle_id",
+                "compute_tile_metadata",
+                "compute_tile_bounding_boxes",
+                "tile_pair_candidate_count",
+                "tile_pair_finalize_offsets",
+                "tile_pair_emit",
+                "compute_tile_pair_masks",
+                "scatter_positions_to_tile_order",
             ],
         )?;
         Ok(NeighborKernels {
@@ -777,6 +1171,33 @@ impl NeighborKernels {
             )?,
             scatter_atoms_into_cells: get_func(device, "neighbor", "scatter_atoms_into_cells")?,
             sort_cells_by_particle_id: get_func(device, "neighbor", "sort_cells_by_particle_id")?,
+            compute_tile_metadata: get_func(device, "neighbor", "compute_tile_metadata")?,
+            compute_tile_bounding_boxes: get_func(
+                device,
+                "neighbor",
+                "compute_tile_bounding_boxes",
+            )?,
+            tile_pair_candidate_count: get_func(
+                device,
+                "neighbor",
+                "tile_pair_candidate_count",
+            )?,
+            tile_pair_finalize_offsets: get_func(
+                device,
+                "neighbor",
+                "tile_pair_finalize_offsets",
+            )?,
+            tile_pair_emit: get_func(device, "neighbor", "tile_pair_emit")?,
+            compute_tile_pair_masks: get_func(
+                device,
+                "neighbor",
+                "compute_tile_pair_masks",
+            )?,
+            scatter_positions_to_tile_order: get_func(
+                device,
+                "neighbor",
+                "scatter_positions_to_tile_order",
+            )?,
         })
     }
 }

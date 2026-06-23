@@ -39,6 +39,11 @@ impl KernelStage {
     /// rq-9f309378
     pub const JIT_COMPOSED_PAIR_FORCE: KernelStage =
         KernelStage::new("jit_composed_pair_force");
+    /// rq-b7601928 — Tile-sorted position scatter (one launch per
+    /// step at the start of `ForceField::step`). See
+    /// `rqm/forces/tile-based-pair-force.md`.
+    pub const SCATTER_POSITIONS_TO_TILE_ORDER: KernelStage =
+        KernelStage::new("scatter_positions_to_tile_order");
     /// rq-2d2eaf72
     pub const JIT_COMPOSED_BONDED_FORCE: KernelStage =
         KernelStage::new("jit_composed_bonded_force");
@@ -118,6 +123,7 @@ impl KernelStage {
         Self::COPY_POSITIONS_INTO_REFERENCE,
         Self::NEIGHBOR_LIST_BUILD,
         Self::CLASS_ACCUMULATOR_MEMSET,
+        Self::SCATTER_POSITIONS_TO_TILE_ORDER,
         Self::LJ_PAIR_FORCE,
         Self::COULOMB_PAIR_FORCE,
         Self::SPME_REAL_PAIR_FORCE,

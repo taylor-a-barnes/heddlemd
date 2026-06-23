@@ -1358,6 +1358,8 @@ fn max_cutoff_aggregation_determines_neighbor_list_radius() {
         &NeighborListConfig::CellList {
             max_neighbors: 16,
             r_skin: 0.0,
+            tile_pair_initial_capacity_per_tile: 256,
+            tile_pair_growth_factor: 1.5,
         },
     )
     .unwrap();

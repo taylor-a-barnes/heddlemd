@@ -568,7 +568,12 @@ impl ForceField {
             .fold(None::<Real>, |acc, c| Some(acc.map_or(c, |a| a.max(c))));
         let neighbor_list = if let Some(r_cut) = aggregated_cutoff {
             match neighbor_list_config {
-                NeighborListConfig::CellList { max_neighbors, r_skin } => Some(
+                NeighborListConfig::CellList {
+                    max_neighbors,
+                    r_skin,
+                    tile_pair_initial_capacity_per_tile: _,
+                    tile_pair_growth_factor: _,
+                } => Some(
                     NeighborListState::new_cell_list(
                         gpu,
                         sim_box,
@@ -862,7 +867,6 @@ impl ForceField {
         }
         timings.kernel_stop(KernelStage::CLASS_ACCUMULATOR_MEMSET)?;
 
-        let nl_ref = self.neighbor_list.as_ref();
         // Launch the JIT-composed pair-force kernel once for the
         // fast-class pair-force slots when (a) the framework has a
         // composed kernel built, (b) we're evaluating the Fast class,
@@ -873,6 +877,33 @@ impl ForceField {
         let dispatch_jit = evaluating_fast
             && self.jit_composed.is_some()
             && !self.jit_slot_indices.is_empty();
+        if dispatch_jit {
+            // rq-b7601928 — Refresh the tile-sorted position view
+            // from the current positions before the pair-force
+            // kernel reads it. The JIT-composed pair-force kernel
+            // reads `tile_sorted_positions_*` exclusively (no
+            // `positions_*` reads in its common args), so this
+            // scatter is what makes its position loads coalesced.
+            timings.kernel_start(KernelStage::SCATTER_POSITIONS_TO_TILE_ORDER)?;
+            {
+                let kernels = self.kernels.clone();
+                let nl = self
+                    .neighbor_list
+                    .as_mut()
+                    .expect("JIT pair-force kernel requires a shared neighbor list");
+                crate::gpu::scatter_positions_to_tile_order(
+                    &kernels,
+                    buffers,
+                    &nl.tile_sorted_particle_ids,
+                    &mut nl.tile_sorted_positions_x,
+                    &mut nl.tile_sorted_positions_y,
+                    &mut nl.tile_sorted_positions_z,
+                )?;
+            }
+            timings.kernel_stop(KernelStage::SCATTER_POSITIONS_TO_TILE_ORDER)?;
+        }
+
+        let nl_ref = self.neighbor_list.as_ref();
         if dispatch_jit {
             timings.kernel_start(KernelStage::JIT_COMPOSED_PAIR_FORCE)?;
             let nl = self
@@ -886,13 +917,18 @@ impl ForceField {
             };
             let mut launch_builder = PairForceLaunchBuilder::new();
             // Common args, in the order the composer's entry-point
-            // signature declares them.
-            launch_builder.push_device_buffer(&buffers.positions_x);
-            launch_builder.push_device_buffer(&buffers.positions_y);
-            launch_builder.push_device_buffer(&buffers.positions_z);
-            launch_builder.push_device_buffer(&nl.neighbor_list);
-            launch_builder.push_device_buffer(&nl.neighbor_counts);
-            launch_builder.push_scalar(self.jit_max_neighbors);
+            // signature declares them. See
+            // `rqm/forces/tile-based-pair-force.md` for the
+            // tile-based architecture's data-model.
+            launch_builder.push_device_buffer(&nl.tile_sorted_positions_x);
+            launch_builder.push_device_buffer(&nl.tile_sorted_positions_y);
+            launch_builder.push_device_buffer(&nl.tile_sorted_positions_z);
+            launch_builder.push_device_buffer(&nl.tile_sorted_particle_ids);
+            launch_builder.push_device_buffer(&nl.tile_pair_offsets);
+            launch_builder.push_device_buffer(&nl.tile_pair_list);
+            launch_builder.push_device_buffer(&nl.tile_pair_masks);
+            launch_builder.push_device_buffer(&nl.tile_atom_count);
+            launch_builder.push_device_buffer(&nl.tile_lane_mask);
             launch_builder.push_device_buffer(sim_box.lattice_device());
             launch_builder.push_device_buffer(&self.fast_total_forces_x);
             launch_builder.push_device_buffer(&self.fast_total_forces_y);
@@ -913,7 +949,7 @@ impl ForceField {
                 .as_ref()
                 .expect("dispatch_jit implies jit_composed.is_some()");
             unsafe {
-                jit.launch(n as u32, write_scalars, launch_builder)?;
+                jit.launch(nl.n_tiles, write_scalars, launch_builder)?;
             }
             timings.kernel_stop(KernelStage::JIT_COMPOSED_PAIR_FORCE)?;
         }
