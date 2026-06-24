@@ -41,9 +41,11 @@ trajectory_every = 0
 # randomise and local structure relax from the minimized lattice
 # state before the barostat is turned on. No trajectory written
 # during equilibration; only a log row every 200 fs to monitor T.
+# Step count scaled down ~10x from the 8192-molecule example because
+# each step costs ~8x more on a system 8x as large.
 [[phase]]
 name = "equil"
-n_steps = 2500              # 2,500 × 2 fs = 5 ps NVT thermalisation
+n_steps = 250               # 250 × 2 fs = 500 fs NVT thermalisation
 dt = 2.0e-15
 
 [phase.integrator]
@@ -58,14 +60,16 @@ seed = 11                   # independent of every other stochastic-slot seed
 
 [phase.output]
 trajectory_every = 0
-log_every = 250             # 1 log row per 500 fs (11 rows over 5 ps)
+log_every = 50              # 1 log row per 100 fs (6 rows over 500 fs)
 
 # --- Phase 3: NPT production ---
 # CSVR thermostat + c-rescale barostat. Samples the canonical NPT
-# distribution exactly. Trajectory written every 1 ps for RDF analysis.
+# distribution exactly. Step count scaled down ~8x from the
+# 8192-molecule example because each step costs ~8x more on a system
+# 8x as large.
 [[phase]]
 name = "prod"
-n_steps = 1000              # 1,000 × 2 fs = 2 ps NPT
+n_steps = 125               # 125 × 2 fs = 250 fs NPT
 dt = 2.0e-15
 
 [phase.integrator]
@@ -90,7 +94,7 @@ seed = 13
 trajectory_every = 0
 include_velocities = false
 include_images = false
-log_every = 50              # 1 log row per 100 fs (21 rows over 2 ps)
+log_every = 25              # 1 log row per 50 fs (6 rows over 250 fs)
 
 # --- Global fields below apply to every phase ---
 
@@ -133,11 +137,14 @@ r_switch = 1.0e-9
 
 # SPME electrostatics: real-space cutoff matches the LJ cutoff so the
 # same neighbor list serves both, plus reciprocal-space pipeline with a
-# ~1 Å FFT grid spacing.
+# ~1 Å FFT grid spacing. Box is 12.8 × 12.8 × 25.6 nm; grid is doubled
+# in each direction relative to the 8192-molecule example to preserve
+# the same ~1.33 Å/cell density. Both 96 and 192 are small-prime-
+# factored (2^5·3 and 2^6·3) for cuFFT.
 [spme]
 alpha = 3.5e9               # 1/m  (≈ 3.5 / r_cut_real)
 r_cut_real = 1.0e-9         # m
-grid = [48, 48, 96]         # one grid point per ~1.04 Å (small-prime-factored for cuFFT)
+grid = [96, 96, 192]        # one grid point per ~1.33 Å (small-prime-factored for cuFFT)
 spline_order = 4            # default
 
 # Rigid SPC/E geometry via SHAKE.

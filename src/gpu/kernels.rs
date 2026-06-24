@@ -9,7 +9,7 @@ use crate::gpu::LosslessBuffers;
 use crate::gpu::{GpuError, Kernels, ParticleBuffers};
 use crate::io::config::{PairInteractionConfig, PairPotentialParams, ParticleTypeConfig};
 use crate::pbc::SimulationBox;
-use crate::precision::Real;
+use crate::precision::{Real, Real4};
 
 const BLOCK_SIZE: u32 = 256;
 
@@ -46,9 +46,7 @@ pub fn vv_kick_drift(
         func.launch(
             cfg,
             (
-                &mut buffers.positions_x,
-                &mut buffers.positions_y,
-                &mut buffers.positions_z,
+                &mut buffers.posq,
                 &mut buffers.images_x,
                 &mut buffers.images_y,
                 &mut buffers.images_z,
@@ -218,9 +216,7 @@ pub fn lj_pair_force(
             func.launch(
                 cfg,
                 (
-                    &particle_buffers.positions_x,
-                    &particle_buffers.positions_y,
-                    &particle_buffers.positions_z,
+                    &particle_buffers.posq,
                     &particle_buffers.type_indices,
                     max_neighbors,
                     lattice,
@@ -249,9 +245,7 @@ pub fn lj_pair_force(
                 func.launch(
                     cfg,
                     (
-                        &particle_buffers.positions_x,
-                        &particle_buffers.positions_y,
-                        &particle_buffers.positions_z,
+                        &particle_buffers.posq,
                         &particle_buffers.type_indices,
                         max_neighbors,
                         lattice,
@@ -309,7 +303,6 @@ pub fn coulomb_pair_force(
     debug_assert_eq!(neighbor_counts.len(), n);
     debug_assert_eq!(atom_excl_offsets.len(), n + 1);
     debug_assert_eq!(atom_excl_partners.len(), atom_excl_coul_scales.len());
-    debug_assert_eq!(particle_buffers.charges.len(), n);
     debug_assert_eq!(output.force_x.len(), n);
 
     let n_u32 = n as u32;
@@ -326,10 +319,7 @@ pub fn coulomb_pair_force(
             func.launch(
                 cfg,
                 (
-                    &particle_buffers.positions_x,
-                    &particle_buffers.positions_y,
-                    &particle_buffers.positions_z,
-                    &particle_buffers.charges,
+                    &particle_buffers.posq,
                     max_neighbors,
                     lattice,
                     K_COULOMB_F32,
@@ -355,10 +345,7 @@ pub fn coulomb_pair_force(
                 func.launch(
                     cfg,
                     (
-                        &particle_buffers.positions_x,
-                        &particle_buffers.positions_y,
-                        &particle_buffers.positions_z,
-                        &particle_buffers.charges,
+                        &particle_buffers.posq,
                         max_neighbors,
                         lattice,
                         K_COULOMB_F32,
@@ -407,7 +394,6 @@ pub fn spme_real_pair_force(
     debug_assert_eq!(neighbor_counts.len(), n);
     debug_assert_eq!(atom_excl_offsets.len(), n + 1);
     debug_assert_eq!(atom_excl_partners.len(), atom_excl_coul_scales.len());
-    debug_assert_eq!(particle_buffers.charges.len(), n);
     debug_assert_eq!(output.force_x.len(), n);
 
     let n_u32 = n as u32;
@@ -424,10 +410,7 @@ pub fn spme_real_pair_force(
             func.launch(
                 cfg,
                 (
-                    &particle_buffers.positions_x,
-                    &particle_buffers.positions_y,
-                    &particle_buffers.positions_z,
-                    &particle_buffers.charges,
+                    &particle_buffers.posq,
                     max_neighbors,
                     lattice,
                     K_COULOMB_F32,
@@ -453,10 +436,7 @@ pub fn spme_real_pair_force(
                 func.launch(
                     cfg,
                     (
-                        &particle_buffers.positions_x,
-                        &particle_buffers.positions_y,
-                        &particle_buffers.positions_z,
-                        &particle_buffers.charges,
+                        &particle_buffers.posq,
                         max_neighbors,
                         lattice,
                         K_COULOMB_F32,
@@ -505,22 +485,24 @@ pub fn spme_spread_fixed_point(
     let n_c = grid[2];
     let m = n_a as usize * n_b as usize * n_c as usize;
     debug_assert_eq!(rho_fixed.len(), m);
-    debug_assert_eq!(particle_buffers.charges.len(), n);
     debug_assert_eq!(sorted_atom_index.len(), n);
 
     let n_u32 = n as u32;
+    // PME_ORDER (= spline_order) threads per atom, each owning one
+    // z-slice of the p^3 spline support and looping over the
+    // p^2 (d_a, d_b) cells in that slice.
+    let n_threads = n_u32.checked_mul(spline_order).expect(
+        "n * spline_order overflows u32 — particle_count too large for this kernel",
+    );
     let cfg = LaunchConfig {
-        grid_dim: (n_u32.div_ceil(8), 1, 1),
+        grid_dim: (n_threads.div_ceil(256), 1, 1),
         block_dim: (256, 1, 1),
         shared_mem_bytes: 0,
     };
     let lattice = sim_box.lattice_device();
     let func = particle_buffers.kernels.spme_recip.spme_spread_fixed_point.clone();
     let args = (
-        &particle_buffers.positions_x,
-        &particle_buffers.positions_y,
-        &particle_buffers.positions_z,
-        &particle_buffers.charges,
+        &particle_buffers.posq,
         sorted_atom_index,
         lattice,
         n_a,
@@ -714,7 +696,6 @@ pub fn spme_force_gather(
         grid[0] as usize * grid[1] as usize * grid[2] as usize;
     debug_assert_eq!(v.len(), m);
     debug_assert_eq!(w_per_particle_virial.len(), 1);
-    debug_assert_eq!(particle_buffers.charges.len(), n);
     debug_assert_eq!(u_self_per_particle.len(), n);
     debug_assert_eq!(sorted_atom_index.len(), n);
     debug_assert_eq!(slot_force_x.len(), n);
@@ -731,10 +712,7 @@ pub fn spme_force_gather(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
-                &particle_buffers.charges,
+                &particle_buffers.posq,
                 v,
                 u_self_per_particle,
                 w_per_particle_virial,
@@ -789,9 +767,7 @@ pub fn spme_compute_bin_key(
     let lattice = sim_box.lattice_device();
     let func = particle_buffers.kernels.spme_recip.spme_compute_bin_key.clone();
     let args = (
-        &particle_buffers.positions_x,
-        &particle_buffers.positions_y,
-        &particle_buffers.positions_z,
+        &particle_buffers.posq,
         lattice,
         n_a,
         n_b,
@@ -1535,9 +1511,7 @@ pub fn rescale_positions_device_factor(
         func.launch(
             cfg,
             (
-                &mut particle_buffers.positions_x,
-                &mut particle_buffers.positions_y,
-                &mut particle_buffers.positions_z,
+                &mut particle_buffers.posq,
                 factor,
                 n_u32,
             ),
@@ -1609,9 +1583,7 @@ pub fn rescale_positions(
         func.launch(
             cfg,
             (
-                &mut particle_buffers.positions_x,
-                &mut particle_buffers.positions_y,
-                &mut particle_buffers.positions_z,
+                &mut particle_buffers.posq,
                 factor,
                 n_u32,
             ),
@@ -1679,9 +1651,7 @@ pub fn mtk_position_drift(
         func.launch(
             cfg,
             (
-                &mut particle_buffers.positions_x,
-                &mut particle_buffers.positions_y,
-                &mut particle_buffers.positions_z,
+                &mut particle_buffers.posq,
                 &particle_buffers.velocities_x,
                 &particle_buffers.velocities_y,
                 &particle_buffers.velocities_z,
@@ -1781,9 +1751,7 @@ pub fn neighbor_displacement_squared(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
+                &particle_buffers.posq,
                 reference_x,
                 reference_y,
                 reference_z,
@@ -1845,9 +1813,7 @@ pub fn neighbor_list_build(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
+                &particle_buffers.posq,
                 sorted_particle_ids,
                 cell_offsets,
                 lattice,
@@ -1888,9 +1854,7 @@ pub fn copy_positions_into_reference(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
+                &particle_buffers.posq,
                 reference_x,
                 reference_y,
                 reference_z,
@@ -1936,9 +1900,7 @@ pub fn compute_cell_indices_and_histogram(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
+                &particle_buffers.posq,
                 lattice,
                 n_cells[0],
                 n_cells[1],
@@ -2110,6 +2072,274 @@ pub fn sort_cells_by_particle_id(
     Ok(())
 }
 
+// =====================================================================
+// Packed-neighbour pair-force pipeline launchers
+// (rqm/forces/packed-neighbour-pair-force.md)
+// =====================================================================
+
+const PACKED_NL_WARPS_PER_BLOCK: u32 = 4;
+const PACKED_NL_BLOCK_SIZE: u32 = PACKED_NL_WARPS_PER_BLOCK * 32;
+const PACKED_BBOX_WARPS_PER_BLOCK: u32 = 8;
+const PACKED_BBOX_BLOCK_SIZE: u32 = PACKED_BBOX_WARPS_PER_BLOCK * 32;
+
+pub fn scatter_positions_to_tile_order(
+    kernels: &Kernels,
+    particle_buffers: &ParticleBuffers,
+    sorted_particle_ids: &CudaSlice<u32>,
+    tile_sorted_posq: &mut CudaSlice<Real4>,
+) -> Result<(), GpuError> {
+    let n = particle_buffers.particle_count();
+    if n == 0 {
+        return Ok(());
+    }
+    let n_u32 = n as u32;
+    let func = kernels.neighbor.scatter_positions_to_tile_order.clone();
+    let cfg = launch_config(n_u32);
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                &particle_buffers.posq,
+                sorted_particle_ids,
+                &mut *tile_sorted_posq,
+                n_u32,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+pub fn fill_tile_position_padding(
+    kernels: &Kernels,
+    tile_sorted_posq: &mut CudaSlice<Real4>,
+    n: u32,
+    padded_n: u32,
+) -> Result<(), GpuError> {
+    if padded_n <= n {
+        return Ok(());
+    }
+    let padding = padded_n - n;
+    let func = kernels.neighbor.fill_tile_position_padding.clone();
+    let cfg = launch_config(padding);
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                &mut *tile_sorted_posq,
+                n,
+                padded_n,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+pub fn compute_block_bbox(
+    kernels: &Kernels,
+    tile_sorted_posq: &CudaSlice<Real4>,
+    tile_atom_count: &CudaSlice<u32>,
+    block_centre: &mut CudaSlice<Real>,
+    block_bbox: &mut CudaSlice<Real>,
+    n_blocks: u32,
+) -> Result<(), GpuError> {
+    if n_blocks == 0 {
+        return Ok(());
+    }
+    let cfg = LaunchConfig {
+        grid_dim: (n_blocks.div_ceil(PACKED_BBOX_WARPS_PER_BLOCK).max(1), 1, 1),
+        block_dim: (PACKED_BBOX_BLOCK_SIZE, 1, 1),
+        shared_mem_bytes: 0,
+    };
+    let func = kernels.neighbor.compute_block_bbox.clone();
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                tile_sorted_posq,
+                tile_atom_count,
+                &mut *block_centre,
+                &mut *block_bbox,
+                n_blocks,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn find_blocks_with_interactions(
+    kernels: &Kernels,
+    tile_sorted_posq: &CudaSlice<Real4>,
+    sorted_particle_ids: &CudaSlice<u32>,
+    block_centre: &CudaSlice<Real>,
+    block_bbox: &CudaSlice<Real>,
+    sim_box: &SimulationBox,
+    r_search_sq: Real,
+    n_blocks: u32,
+    n_atoms: u32,
+    max_entries: u32,
+    max_single_pairs: u32,
+    interacting_tiles: &mut CudaSlice<u32>,
+    interacting_atoms: &mut CudaSlice<u32>,
+    single_pair_atoms: &mut CudaSlice<u32>,
+    interaction_count: &mut CudaSlice<u32>,
+    overflow_flag: &mut CudaSlice<u32>,
+) -> Result<(), GpuError> {
+    if n_blocks == 0 {
+        return Ok(());
+    }
+    let cfg = LaunchConfig {
+        grid_dim: (n_blocks.div_ceil(PACKED_NL_WARPS_PER_BLOCK).max(1), 1, 1),
+        block_dim: (PACKED_NL_BLOCK_SIZE, 1, 1),
+        shared_mem_bytes: 0,
+    };
+    let func = kernels.neighbor.find_blocks_with_interactions.clone();
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                tile_sorted_posq,
+                sorted_particle_ids,
+                block_centre,
+                block_bbox,
+                sim_box.lattice_device(),
+                r_search_sq,
+                n_blocks,
+                n_atoms,
+                max_entries,
+                max_single_pairs,
+                &mut *interacting_tiles,
+                &mut *interacting_atoms,
+                &mut *single_pair_atoms,
+                &mut *interaction_count,
+                &mut *overflow_flag,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn histogram_entries_by_iblock(
+    kernels: &Kernels,
+    interacting_tiles: &CudaSlice<u32>,
+    entry_count_ptr: &CudaSlice<u32>,
+    iblock_count: &mut CudaSlice<u32>,
+    n_blocks: u32,
+    max_entry_count: u32,
+) -> Result<(), GpuError> {
+    if max_entry_count == 0 || n_blocks == 0 {
+        return Ok(());
+    }
+    let cfg = launch_config(max_entry_count);
+    let func = kernels.neighbor.histogram_entries_by_iblock.clone();
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                interacting_tiles,
+                entry_count_ptr,
+                &mut *iblock_count,
+                n_blocks,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn scatter_entries_by_iblock(
+    kernels: &Kernels,
+    interacting_tiles: &CudaSlice<u32>,
+    interacting_atoms: &CudaSlice<u32>,
+    entry_count_ptr: &CudaSlice<u32>,
+    iblock_offset: &CudaSlice<u32>,
+    iblock_cursor: &mut CudaSlice<u32>,
+    sorted_interacting_atoms: &mut CudaSlice<u32>,
+    n_blocks: u32,
+    max_entry_count: u32,
+) -> Result<(), GpuError> {
+    if max_entry_count == 0 || n_blocks == 0 {
+        return Ok(());
+    }
+    // One warp per entry; 8 warps per block = 256 threads.
+    let warps_per_block: u32 = 8;
+    let block_dim: u32 = warps_per_block * 32;
+    let grid_x = max_entry_count.div_ceil(warps_per_block).max(1);
+    let cfg = LaunchConfig {
+        grid_dim: (grid_x, 1, 1),
+        block_dim: (block_dim, 1, 1),
+        shared_mem_bytes: 0,
+    };
+    let func = kernels.neighbor.scatter_entries_by_iblock.clone();
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                interacting_tiles,
+                interacting_atoms,
+                entry_count_ptr,
+                iblock_offset,
+                &mut *iblock_cursor,
+                &mut *sorted_interacting_atoms,
+                n_blocks,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn finalize_packed_forces(
+    kernels: &Kernels,
+    fp_fx: &CudaSlice<u64>,
+    fp_fy: &CudaSlice<u64>,
+    fp_fz: &CudaSlice<u64>,
+    fp_e: &CudaSlice<u64>,
+    fp_w: &CudaSlice<u64>,
+    out_fx: &mut cudarc::driver::CudaViewMut<'_, Real>,
+    out_fy: &mut cudarc::driver::CudaViewMut<'_, Real>,
+    out_fz: &mut cudarc::driver::CudaViewMut<'_, Real>,
+    out_e: &mut cudarc::driver::CudaViewMut<'_, Real>,
+    out_w: &mut cudarc::driver::CudaViewMut<'_, Real>,
+    n: u32,
+    write_ev: bool,
+) -> Result<(), GpuError> {
+    if n == 0 {
+        return Ok(());
+    }
+    let cfg = launch_config(n);
+    let func = kernels.neighbor.finalize_packed_forces.clone();
+    let ev_u32: u32 = if write_ev { 1 } else { 0 };
+    unsafe {
+        func.launch(
+            cfg,
+            (
+                fp_fx,
+                fp_fy,
+                fp_fz,
+                fp_e,
+                fp_w,
+                &mut *out_fx,
+                &mut *out_fy,
+                &mut *out_fz,
+                &mut *out_e,
+                &mut *out_w,
+                n,
+                ev_u32,
+            ),
+        )
+        .map_err(GpuError::from)?;
+    }
+    Ok(())
+}
+
 // rq-7d5e87ee
 #[cfg(not(feature = "f64"))]
 pub fn vv_kick_drift_lossless(
@@ -2131,9 +2361,7 @@ pub fn vv_kick_drift_lossless(
         func.launch(
             cfg,
             (
-                &mut buffers.positions_x,
-                &mut buffers.positions_y,
-                &mut buffers.positions_z,
+                &mut buffers.posq,
                 &mut buffers.images_x,
                 &mut buffers.images_y,
                 &mut buffers.images_z,
@@ -2178,9 +2406,7 @@ pub fn lan_drift_half(
         func.launch(
             cfg,
             (
-                &mut buffers.positions_x,
-                &mut buffers.positions_y,
-                &mut buffers.positions_z,
+                &mut buffers.posq,
                 &mut buffers.images_x,
                 &mut buffers.images_y,
                 &mut buffers.images_z,
@@ -2299,9 +2525,7 @@ pub fn shake_snapshot(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
+                &particle_buffers.posq,
                 group_atoms,
                 group_atom_offset,
                 group_atom_count,
@@ -2347,9 +2571,7 @@ pub fn shake_positions(
         func.launch(
             cfg,
             (
-                &mut particle_buffers.positions_x,
-                &mut particle_buffers.positions_y,
-                &mut particle_buffers.positions_z,
+                &mut particle_buffers.posq,
                 &mut particle_buffers.velocities_x,
                 &mut particle_buffers.velocities_y,
                 &mut particle_buffers.velocities_z,
@@ -2438,9 +2660,7 @@ pub fn shake_positions_no_velocity(
         func.launch(
             cfg,
             (
-                &mut particle_buffers.positions_x,
-                &mut particle_buffers.positions_y,
-                &mut particle_buffers.positions_z,
+                &mut particle_buffers.posq,
                 group_atoms,
                 group_atom_offset,
                 group_atom_count,
@@ -2486,9 +2706,7 @@ pub fn rattle_velocities(
         func.launch(
             cfg,
             (
-                &particle_buffers.positions_x,
-                &particle_buffers.positions_y,
-                &particle_buffers.positions_z,
+                &particle_buffers.posq,
                 &mut particle_buffers.velocities_x,
                 &mut particle_buffers.velocities_y,
                 &mut particle_buffers.velocities_z,

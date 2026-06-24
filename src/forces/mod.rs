@@ -28,7 +28,7 @@ use crate::precision::Real;
 pub use angle::{HarmonicAngleBuilder, HarmonicAngleState};
 pub use coulomb::{CoulombBuilder, CoulombParameters, CoulombState};
 pub use jit_composed::{
-    AngleForceFragment, AngleScratchView, BondedForceFragment, BondedScratchView,
+    AngleForceFragment, AngleScratchView, BondedForceFragment, BondedScratchView, CutoffHandling,
     ForceLaunchBuilder, ForceLaunchContext, JitComposedAngleForce, JitComposedBondedForce,
     JitComposedPairForce, JitComposedPostForcePerParticle, PairForceBindContext,
     PairForceFragment, PairForceLaunchBuilder, PerParticleFragment, PostForceBindContext,
@@ -345,11 +345,20 @@ impl Default for PotentialRegistry {
 }
 
 pub(crate) fn max_neighbors_from(cfg: &NeighborListConfig, particle_count: usize) -> u32 {
+    // The packed-neighbour pair-force pipeline (see
+    // `rqm/forces/packed-neighbour-pair-force.md`) sizes its entry
+    // list at runtime via overflow-driven growth, so no user-supplied
+    // per-atom cap exists for cell-list mode. Per-particle padded
+    // structures kept around for legacy callers fall back to a fixed
+    // default in cell-list mode and to the all-pairs upper bound in
+    // trivial mode.
     match cfg {
         NeighborListConfig::AllPairs => particle_count as u32,
-        NeighborListConfig::CellList { max_neighbors, .. } => *max_neighbors,
+        NeighborListConfig::CellList { .. } => LEGACY_FALLBACK_MAX_NEIGHBORS,
     }
 }
+
+pub(crate) const LEGACY_FALLBACK_MAX_NEIGHBORS: u32 = 1024;
 
 // rq-684a29f1
 #[derive(Debug)]
@@ -367,12 +376,29 @@ pub struct ForceField {
     pub slow_total_forces_z: CudaSlice<Real>,
     pub slow_total_potential_energies: CudaSlice<Real>,
     pub slow_total_virials: CudaSlice<Real>,
+    /// Fixed-point per-particle accumulators for fast-class pair-force
+    /// slots (see `rqm/forces/packed-neighbour-pair-force.md`). Scale
+    /// `2^32`; interpreted as `i64` two's-complement.
+    pub fast_total_forces_fp_x: CudaSlice<u64>,
+    pub fast_total_forces_fp_y: CudaSlice<u64>,
+    pub fast_total_forces_fp_z: CudaSlice<u64>,
+    pub fast_total_potential_energies_fp: CudaSlice<u64>,
+    pub fast_total_virials_fp: CudaSlice<u64>,
     pub neighbor_list: Option<NeighborListState>,
     /// JIT-composed pair-force kernel, built when at least one
     /// fast-class pair-force slot is active. `None` when no
     /// fast-class pair-force slot is configured (zero-slot ForceField,
     /// or ForceField with only bonded / angle / slow slots).
     pub jit_composed: Option<JitComposedPairForce>,
+    /// Flat `(atom_i, atom_j)` pairs for every canonical exclusion in
+    /// the topology, interleaved as `[i0, j0, i1, j1, …]`. Built once
+    /// at `ForceField::new` from `ExclusionList.entries`, never
+    /// re-uploaded. Consumed by the per-pair JIT correction kernel
+    /// (one thread per pair). Length `0` when the topology has no
+    /// exclusions. `excluded_pair_count == excluded_pair_atoms.len() / 2`.
+    pub excluded_pair_atoms: CudaSlice<u32>,
+    /// Number of canonical exclusion pairs.
+    pub excluded_pair_count: u32,
     /// Indices into `slots` of fast-class pair-force slots that
     /// participate in the JIT-composed kernel. The framework bypasses
     /// these slots' `Potential::compute` at step time and instead
@@ -561,6 +587,14 @@ impl ForceField {
             device.alloc_zeros::<Real>(n).map_err(GpuError::from)?;
         let slow_total_virials = device.alloc_zeros::<Real>(n).map_err(GpuError::from)?;
 
+        // Fixed-point accumulators for the packed-neighbour pair-force path.
+        let fast_total_forces_fp_x = device.alloc_zeros::<u64>(n).map_err(GpuError::from)?;
+        let fast_total_forces_fp_y = device.alloc_zeros::<u64>(n).map_err(GpuError::from)?;
+        let fast_total_forces_fp_z = device.alloc_zeros::<u64>(n).map_err(GpuError::from)?;
+        let fast_total_potential_energies_fp =
+            device.alloc_zeros::<u64>(n).map_err(GpuError::from)?;
+        let fast_total_virials_fp = device.alloc_zeros::<u64>(n).map_err(GpuError::from)?;
+
         // Build the shared NeighborListState when any slot reports a cutoff.
         let aggregated_cutoff: Option<Real> = slots
             .iter()
@@ -568,13 +602,13 @@ impl ForceField {
             .fold(None::<Real>, |acc, c| Some(acc.map_or(c, |a| a.max(c))));
         let neighbor_list = if let Some(r_cut) = aggregated_cutoff {
             match neighbor_list_config {
-                NeighborListConfig::CellList { max_neighbors, r_skin } => Some(
+                NeighborListConfig::CellList { r_skin } => Some(
                     NeighborListState::new_cell_list(
                         gpu,
                         sim_box,
                         particle_count,
                         r_cut,
-                        *max_neighbors,
+                        LEGACY_FALLBACK_MAX_NEIGHBORS,
                         *r_skin as Real,
                     )?,
                 ),
@@ -615,7 +649,17 @@ impl ForceField {
         let jit_composed = if jit_fragments.is_empty() {
             None
         } else {
-            Some(JitComposedPairForce::compile_and_load(&device, &jit_fragments)?)
+            // Every slot that contributed a fragment had
+            // `max_cutoff().is_some()`, so `aggregated_cutoff` is Some
+            // on this branch by construction. The JIT embeds the value
+            // as `HEDDLE_JIT_MAX_CUTOFF_SQUARED` for the per-pair prune.
+            let jit_max_cutoff = aggregated_cutoff
+                .expect("aggregated_cutoff is Some when jit_fragments is non-empty");
+            Some(JitComposedPairForce::compile_and_load(
+                &device,
+                &jit_fragments,
+                jit_max_cutoff,
+            )?)
         };
         // All fast-class pair-force slots in this codebase resolve
         // their `max_neighbors` from `NeighborListConfig` via
@@ -668,6 +712,29 @@ impl ForceField {
             )?)
         };
 
+        // Build the per-pair exclusion correction list. ExclusionList
+        // stores canonical entries (atom_i < atom_j) with no
+        // duplicates; pack them as interleaved (atom_i, atom_j) so the
+        // JIT correction kernel reads one pair per thread.
+        let mut excluded_pair_flat: Vec<u32> =
+            Vec::with_capacity(2 * exclusion_list.entries.len());
+        for excl in &exclusion_list.entries {
+            excluded_pair_flat.push(excl.atom_i);
+            excluded_pair_flat.push(excl.atom_j);
+        }
+        let excluded_pair_count = exclusion_list.entries.len() as u32;
+        let excluded_pair_atoms = if excluded_pair_flat.is_empty() {
+            // cudarc's alloc_zeros requires len > 0; use a single
+            // zeroed slot so the kernel arg remains valid even with no
+            // exclusions (the correction kernel is not launched when
+            // count is 0, so the buffer contents are not read).
+            device.alloc_zeros::<u32>(1).map_err(GpuError::from)?
+        } else {
+            device
+                .htod_sync_copy(&excluded_pair_flat)
+                .map_err(GpuError::from)?
+        };
+
         Ok(ForceField {
             device,
             kernels,
@@ -682,8 +749,15 @@ impl ForceField {
             slow_total_forces_z,
             slow_total_potential_energies,
             slow_total_virials,
+            fast_total_forces_fp_x,
+            fast_total_forces_fp_y,
+            fast_total_forces_fp_z,
+            fast_total_potential_energies_fp,
+            fast_total_virials_fp,
             neighbor_list,
             jit_composed,
+            excluded_pair_atoms,
+            excluded_pair_count,
             jit_slot_indices,
             jit_max_neighbors,
             jit_composed_bonded,
@@ -695,6 +769,7 @@ impl ForceField {
             particle_count,
         })
     }
+
 
     // rq-3579df3b
     pub fn step(
@@ -862,45 +937,102 @@ impl ForceField {
         }
         timings.kernel_stop(KernelStage::CLASS_ACCUMULATOR_MEMSET)?;
 
-        let nl_ref = self.neighbor_list.as_ref();
         // Launch the JIT-composed pair-force kernel once for the
         // fast-class pair-force slots when (a) the framework has a
         // composed kernel built, (b) we're evaluating the Fast class,
-        // and (c) the participating slot list is non-empty. The
-        // composed kernel handles every fast-class pair-force slot in
-        // a single launch; their `Potential::compute` is bypassed at
-        // step time.
+        // and (c) the participating slot list is non-empty.
         let dispatch_jit = evaluating_fast
             && self.jit_composed.is_some()
             && !self.jit_slot_indices.is_empty();
         if dispatch_jit {
+            // Zero the fixed-point Fast-class accumulators.
+            self.device
+                .memset_zeros(&mut self.fast_total_forces_fp_x)
+                .map_err(GpuError::from)?;
+            self.device
+                .memset_zeros(&mut self.fast_total_forces_fp_y)
+                .map_err(GpuError::from)?;
+            self.device
+                .memset_zeros(&mut self.fast_total_forces_fp_z)
+                .map_err(GpuError::from)?;
+            self.device
+                .memset_zeros(&mut self.fast_total_potential_energies_fp)
+                .map_err(GpuError::from)?;
+            self.device
+                .memset_zeros(&mut self.fast_total_virials_fp)
+                .map_err(GpuError::from)?;
+
+            // Refresh the tile-sorted position view for the current
+            // step's positions.
+            timings.kernel_start(KernelStage::SCATTER_POSITIONS_TO_TILE_ORDER)?;
+            {
+                let kernels = self.kernels.clone();
+                let nl = self
+                    .neighbor_list
+                    .as_mut()
+                    .expect("JIT pair-force kernel requires a shared neighbor list");
+                // Split borrow: sorted_particle_ids and packed live on
+                // disjoint fields of NeighborListState.
+                let sorted_ptr: *const cudarc::driver::CudaSlice<u32> = nl
+                    .sorted_particle_ids_for_packed()
+                    .expect("packed-neighbour dispatch requires sorted_particle_ids");
+                let packed = nl.packed.as_mut().expect("packed data present");
+                let sorted_view = unsafe { &*sorted_ptr };
+                let n_blocks = packed.n_blocks;
+                crate::gpu::scatter_positions_to_tile_order(
+                    &kernels,
+                    buffers,
+                    sorted_view,
+                    &mut packed.tile_sorted_posq,
+                )?;
+                // Refill +∞ padding for partial last block.
+                crate::gpu::fill_tile_position_padding(
+                    &kernels,
+                    &mut packed.tile_sorted_posq,
+                    n as u32,
+                    n_blocks * 32,
+                )?;
+            }
+            timings.kernel_stop(KernelStage::SCATTER_POSITIONS_TO_TILE_ORDER)?;
+
             timings.kernel_start(KernelStage::JIT_COMPOSED_PAIR_FORCE)?;
             let nl = self
                 .neighbor_list
                 .as_ref()
                 .expect("JIT pair-force kernel requires a shared neighbor list");
+            let sorted_view = nl
+                .sorted_particle_ids_for_packed()
+                .expect("packed-neighbour dispatch requires sorted_particle_ids");
+            let packed = nl.packed.as_ref().expect("packed data present");
+            let n_iblocks = packed.n_blocks;
             let bind_ctx = PairForceBindContext {
                 buffers: &*buffers,
                 sim_box,
                 neighbor_list: nl,
             };
             let mut launch_builder = PairForceLaunchBuilder::new();
-            // Common args, in the order the composer's entry-point
-            // signature declares them.
-            launch_builder.push_device_buffer(&buffers.positions_x);
-            launch_builder.push_device_buffer(&buffers.positions_y);
-            launch_builder.push_device_buffer(&buffers.positions_z);
-            launch_builder.push_device_buffer(&nl.neighbor_list);
-            launch_builder.push_device_buffer(&nl.neighbor_counts);
-            launch_builder.push_scalar(self.jit_max_neighbors);
+            // Common args, in the order the composer declares them.
+            // `block_centre` and `block_bbox` are consumed by the
+            // per-block single-periodic-copy fast-path check at the
+            // top of the outer loop; the kernel decides per-block at
+            // runtime whether to apply `triclinic_wrap_against_center`
+            // to pi and pj and skip the per-pair `triclinic_min_image`
+            // call. See `rqm/forces/packed-neighbour-pair-force.md`
+            // *Single-Periodic-Copy Fast Path*.
+            launch_builder.push_device_buffer(&buffers.posq);
+            launch_builder.push_device_buffer(&packed.tile_sorted_posq);
+            launch_builder.push_device_buffer(&packed.block_centre);
+            launch_builder.push_device_buffer(&packed.block_bbox);
+            launch_builder.push_device_buffer(sorted_view);
+            launch_builder.push_device_buffer(&packed.iblock_offset);
+            launch_builder.push_device_buffer(&packed.sorted_interacting_atoms);
+            launch_builder.push_scalar(n_iblocks);
             launch_builder.push_device_buffer(sim_box.lattice_device());
-            launch_builder.push_device_buffer(&self.fast_total_forces_x);
-            launch_builder.push_device_buffer(&self.fast_total_forces_y);
-            launch_builder.push_device_buffer(&self.fast_total_forces_z);
-            if write_scalars {
-                launch_builder.push_device_buffer(&self.fast_total_potential_energies);
-                launch_builder.push_device_buffer(&self.fast_total_virials);
-            }
+            launch_builder.push_device_buffer(&self.fast_total_forces_fp_x);
+            launch_builder.push_device_buffer(&self.fast_total_forces_fp_y);
+            launch_builder.push_device_buffer(&self.fast_total_forces_fp_z);
+            launch_builder.push_device_buffer(&self.fast_total_potential_energies_fp);
+            launch_builder.push_device_buffer(&self.fast_total_virials_fp);
             // Per-fragment args in canonical slot order.
             for &slot_idx in &self.jit_slot_indices {
                 self.slots[slot_idx].bind_pair_force_args(&bind_ctx, &mut launch_builder);
@@ -913,10 +1045,115 @@ impl ForceField {
                 .as_ref()
                 .expect("dispatch_jit implies jit_composed.is_some()");
             unsafe {
-                jit.launch(n as u32, write_scalars, launch_builder)?;
+                jit.launch(n_iblocks, write_scalars, launch_builder)?;
             }
             timings.kernel_stop(KernelStage::JIT_COMPOSED_PAIR_FORCE)?;
+
+            // Sparse-tile single-pair pass. The neighbour-list builder
+            // routes (i-block, j-block) candidates with
+            // `n_hits <= MAX_BITS_FOR_PAIRS = 3` into
+            // `single_pair_atoms` instead of the packed buffer. The
+            // launch covers `single_pairs_capacity` threads
+            // unconditionally (so the kernel is captured into the
+            // CUDA graph even when the post-capture count is zero);
+            // each thread reads the live count from
+            // `interaction_count[1]` via a device pointer and returns
+            // early past the live boundary. The captured kernel thus
+            // tolerates per-rebuild changes to the live count without
+            // graph re-capture.
+            let packed_opt = self
+                .neighbor_list
+                .as_ref()
+                .and_then(|nl| nl.packed.as_ref());
+            if let Some(packed) = packed_opt {
+                if packed.single_pairs_capacity > 0 {
+                    let mut single_pair_builder = PairForceLaunchBuilder::new();
+                    single_pair_builder.push_device_buffer(&buffers.posq);
+                    single_pair_builder.push_device_buffer(&packed.single_pair_atoms);
+                    single_pair_builder.push_device_buffer(&packed.interaction_count);
+                    single_pair_builder.push_device_buffer(sim_box.lattice_device());
+                    single_pair_builder.push_device_buffer(&self.fast_total_forces_fp_x);
+                    single_pair_builder.push_device_buffer(&self.fast_total_forces_fp_y);
+                    single_pair_builder.push_device_buffer(&self.fast_total_forces_fp_z);
+                    single_pair_builder
+                        .push_device_buffer(&self.fast_total_potential_energies_fp);
+                    single_pair_builder.push_device_buffer(&self.fast_total_virials_fp);
+                    for &slot_idx in &self.jit_slot_indices {
+                        self.slots[slot_idx]
+                            .bind_pair_force_args(&bind_ctx, &mut single_pair_builder);
+                    }
+                    single_pair_builder.push_scalar(n as u32);
+                    let cap = packed.single_pairs_capacity;
+                    unsafe {
+                        jit.launch_single_pair(cap, write_scalars, single_pair_builder)?;
+                    }
+                }
+            }
+
+            // Per-pair exclusion correction. The main pair-force kernel
+            // above added `+1 × evaluate` for every pair (excluded or
+            // not). For each excluded pair the correction kernel adds
+            // `(scale − 1) × evaluate`, leaving `scale × evaluate` on
+            // the fixed-point accumulators. When there are no
+            // exclusions, this launch is skipped entirely.
+            if self.excluded_pair_count > 0 {
+                let mut correction_builder = PairForceLaunchBuilder::new();
+                // Common args for the correction entry point (order
+                // must match emit_correction_entry_point).
+                correction_builder.push_device_buffer(&buffers.posq);
+                correction_builder.push_device_buffer(&self.excluded_pair_atoms);
+                correction_builder.push_scalar(self.excluded_pair_count);
+                correction_builder.push_device_buffer(sim_box.lattice_device());
+                correction_builder.push_device_buffer(&self.fast_total_forces_fp_x);
+                correction_builder.push_device_buffer(&self.fast_total_forces_fp_y);
+                correction_builder.push_device_buffer(&self.fast_total_forces_fp_z);
+                correction_builder.push_device_buffer(&self.fast_total_potential_energies_fp);
+                correction_builder.push_device_buffer(&self.fast_total_virials_fp);
+                // Per-fragment args in canonical slot order.
+                for &slot_idx in &self.jit_slot_indices {
+                    self.slots[slot_idx]
+                        .bind_pair_force_args(&bind_ctx, &mut correction_builder);
+                }
+                correction_builder.push_scalar(n as u32);
+                unsafe {
+                    jit.launch_correction(
+                        self.excluded_pair_count,
+                        write_scalars,
+                        correction_builder,
+                    )?;
+                }
+            }
+
+            // Finalize: convert fixed-point sums to Real and add into
+            // the existing fast-class Real accumulator buffers.
+            timings.kernel_start(KernelStage::FINALIZE_PACKED_FORCES)?;
+            {
+                let kernels = self.kernels.clone();
+                let mut fx = self.fast_total_forces_x.slice_mut(..);
+                let mut fy = self.fast_total_forces_y.slice_mut(..);
+                let mut fz = self.fast_total_forces_z.slice_mut(..);
+                let mut fe = self.fast_total_potential_energies.slice_mut(..);
+                let mut fw = self.fast_total_virials.slice_mut(..);
+                crate::gpu::finalize_packed_forces(
+                    &kernels,
+                    &self.fast_total_forces_fp_x,
+                    &self.fast_total_forces_fp_y,
+                    &self.fast_total_forces_fp_z,
+                    &self.fast_total_potential_energies_fp,
+                    &self.fast_total_virials_fp,
+                    &mut fx,
+                    &mut fy,
+                    &mut fz,
+                    &mut fe,
+                    &mut fw,
+                    n as u32,
+                    write_scalars,
+                )?;
+            }
+            timings.kernel_stop(KernelStage::FINALIZE_PACKED_FORCES)?;
         }
+
+        let nl_ref = self.neighbor_list.as_ref();
 
         // Launch the JIT-composed bonded module's per-slot entry
         // points. The composed kernel writes the per-bond contributions
@@ -945,9 +1182,7 @@ impl ForceField {
                     continue;
                 }
                 let mut launch_builder = ForceLaunchBuilder::new();
-                launch_builder.push_device_buffer(&buffers.positions_x);
-                launch_builder.push_device_buffer(&buffers.positions_y);
-                launch_builder.push_device_buffer(&buffers.positions_z);
+                launch_builder.push_device_buffer(&buffers.posq);
                 launch_builder.push_device_buffer(scratch.bonds);
                 launch_builder.push_device_buffer(sim_box.lattice_device());
                 launch_builder.push_device_buffer(scratch.bond_pair_x);
@@ -994,9 +1229,7 @@ impl ForceField {
                     continue;
                 }
                 let mut launch_builder = ForceLaunchBuilder::new();
-                launch_builder.push_device_buffer(&buffers.positions_x);
-                launch_builder.push_device_buffer(&buffers.positions_y);
-                launch_builder.push_device_buffer(&buffers.positions_z);
+                launch_builder.push_device_buffer(&buffers.posq);
                 launch_builder.push_device_buffer(scratch.angles);
                 launch_builder.push_device_buffer(sim_box.lattice_device());
                 launch_builder.push_device_buffer(scratch.angle_triple_x);

@@ -2162,9 +2162,7 @@ fn launch_composed_post_force(
         return Ok(());
     }
     let mut builder = crate::forces::ForceLaunchBuilder::new();
-    builder.push_device_buffer(&buffers.positions_x);
-    builder.push_device_buffer(&buffers.positions_y);
-    builder.push_device_buffer(&buffers.positions_z);
+    builder.push_device_buffer(&buffers.posq);
     builder.push_device_buffer(&buffers.images_x);
     builder.push_device_buffer(&buffers.images_y);
     builder.push_device_buffer(&buffers.images_z);
@@ -2254,6 +2252,14 @@ fn capture_phase_graph(
             Some(c) => Some(c.as_mut()),
             None => None,
         };
+        // Capture with scalars unconditionally so each graph replay
+        // produces a fresh (KE + PE) for the log-row output handler.
+        // The non-graph per-step loop only sets `runner_needs_scalars`
+        // on log/traj steps, but a captured graph is fixed at capture
+        // time — if scalars were off, log rows on every replay would
+        // read the same stale potential-energy buffer the capture left
+        // behind. The extra atomicAdds per step are cheap relative to
+        // the force-eval work.
         let result = if let (Some(_), Some(skip_idx)) =
             (composed_post_force, post_force_substep_index)
         {
@@ -2266,7 +2272,7 @@ fn capture_phase_graph(
                 supports_constraints,
                 dt,
                 timings,
-                barostat.is_some(),
+                true,
                 skip_idx,
             )
         } else {
@@ -2279,7 +2285,7 @@ fn capture_phase_graph(
                 supports_constraints,
                 dt,
                 timings,
-                barostat.is_some(),
+                true,
             )
         };
         if let Err(e) = result {

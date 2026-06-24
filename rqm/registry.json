@@ -94,12 +94,7 @@
   "rq-0099ef65": {
     "decl": "Scenario: Single-step lossless round trip restores observables bit-exactly",
     "file": "pipeline-reversibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Single-step lossless round trip restores observables bit-exactly",
     "type": "scenario"
   },
@@ -263,14 +258,24 @@
   "rq-0181787c": {
     "decl": "Scenario: Build kernel signals overflow when an atom exceeds max_neighbors",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Build kernel signals overflow when an atom exceeds max_neighbors",
     "type": "scenario"
+  },
+  "rq-01d1bb68": {
+    "decl": "Scenario: posq interleave preserves per-atom (x, y, z, charge) grouping",
+    "file": "particle-state",
+    "refs": [],
+    "title": "posq interleave preserves per-atom (x, y, z, charge) grouping",
+    "type": "scenario"
+  },
+  "rq-0206fbeb": {
+    "decl": "## Atom Blocks",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Atom Blocks",
+    "type": "section"
   },
   "rq-020ff80e": {
     "decl": "Scenario: SD does not modify velocities",
@@ -341,6 +346,14 @@
     "refs": [],
     "title": "Mixed charge magnitudes scale linearly",
     "type": "scenario"
+  },
+  "rq-02abafdd": {
+    "decl": "#### Single-Pair and Exclusion-Correction Passes",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 4,
+    "refs": [],
+    "title": "Single-Pair and Exclusion-Correction Passes",
+    "type": "section"
   },
   "rq-02bde767": {
     "decl": "Scenario: Drop best-effort flushes",
@@ -491,6 +504,21 @@
     "title": "Launch configuration",
     "type": "section"
   },
+  "rq-03ec91b0": {
+    "decl": "Scenario: Pair-force outer loop loads posq once per atom and reuses x/y/z/w",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Pair-force outer loop loads posq once per atom and reuses x/y/z/w",
+    "type": "scenario"
+  },
+  "rq-03faaf24": {
+    "decl": "## Exclusion Handling",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Exclusion Handling",
+    "type": "section"
+  },
   "rq-03ff6434": {
     "decl": "Scenario: Drop best-effort flushes",
     "file": "io/trajectory-output",
@@ -516,6 +544,13 @@
     "refs": [],
     "title": "__device__",
     "type": "api-item"
+  },
+  "rq-043c6862": {
+    "decl": "Scenario: Default initial capacity sized to avoid first-build growth",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Default initial capacity sized to avoid first-build growth",
+    "type": "scenario"
   },
   "rq-044f47ec": {
     "decl": "Scenario: Composed kernel is not compiled when no fast-class pair-force slot is present",
@@ -581,6 +616,14 @@
     "title": "Explicit init velocities override sampled velocities",
     "type": "scenario"
   },
+  "rq-04fdeac5": {
+    "decl": "### Exclusion-Correction Pass",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Exclusion-Correction Pass",
+    "type": "section"
+  },
   "rq-0519e35c": {
     "decl": "Scenario: New state has zero-initialised potential_energies and virials",
     "file": "particle-state",
@@ -644,6 +687,13 @@
     "title": "init_device succeeds on a machine with a CUDA GPU",
     "type": "scenario"
   },
+  "rq-059aff56": {
+    "decl": "Scenario: LJ with mixed cutoffs across pair types reports CutoffHandling::PerPair",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "LJ with mixed cutoffs across pair types reports CutoffHandling::PerPair",
+    "type": "scenario"
+  },
   "rq-05b4c988": {
     "decl": "Scenario: Log file header includes berendsen_conserved when Berendsen is the thermostat",
     "file": "integration/berendsen",
@@ -656,20 +706,19 @@
     "title": "Log file header includes berendsen_conserved when Berendsen is the thermostat",
     "type": "scenario"
   },
+  "rq-05b5b488": {
+    "decl": "Scenario: A box where every i-block qualifies matches the all-min-image run bit-for-bit",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "A box where every i-block qualifies matches the all-min-image run bit-for-bit",
+    "type": "scenario"
+  },
   "rq-05d55351": {
     "decl": "# Feature: Morse Bonded Potential",
     "file": "forces/morse-bonded",
     "refs": [],
     "title": "Feature: Morse Bonded Potential",
     "type": "file"
-  },
-  "rq-05e4b5da": {
-    "decl": "### CUDA Kernel Entry Points",
-    "file": "forces/pair-force-kernel",
-    "level": 3,
-    "refs": [],
-    "title": "CUDA Kernel Entry Points",
-    "type": "section"
   },
   "rq-05e8f300": {
     "decl": "Scenario: build_optional with None returns Ok(None)",
@@ -1063,12 +1112,7 @@
     "decl": "## Comparison Procedure",
     "file": "pipeline-reversibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Comparison Procedure",
     "type": "section"
   },
@@ -1251,6 +1295,14 @@
     ],
     "title": "Construct MtkNptIntegrator for a SETTLE'd water system",
     "type": "scenario"
+  },
+  "rq-0acba2a0": {
+    "decl": "## Per-Step Pipeline",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Per-Step Pipeline",
+    "type": "section"
   },
   "rq-0ae304bc": {
     "decl": "Scenario: minimum_image handles many-period displacements (orthorhombic)",
@@ -1591,6 +1643,13 @@
     "title": "StageStats",
     "type": "api-item"
   },
+  "rq-0dc4e38e": {
+    "decl": "Scenario: Exclusion-correction pass dispatches to the correction evaluator",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Exclusion-correction pass dispatches to the correction evaluator",
+    "type": "scenario"
+  },
   "rq-0dc50ce0": {
     "decl": "Scenario: Reject a phase name containing non-ASCII characters",
     "file": "io/config-schema",
@@ -1747,6 +1806,13 @@
     "title": "Thermostat slot",
     "type": "section"
   },
+  "rq-0f761603": {
+    "decl": "Scenario: SPME-real JIT fragment uses the composer-supplied inv_r and r",
+    "file": "forces/spme",
+    "refs": [],
+    "title": "SPME-real JIT fragment uses the composer-supplied inv_r and r",
+    "type": "scenario"
+  },
   "rq-0f81f83f": {
     "decl": "## Berendsen \"conserved quantity\"",
     "file": "integration/berendsen",
@@ -1786,6 +1852,20 @@
     ],
     "title": "ConstraintGroup",
     "type": "api-item"
+  },
+  "rq-0fb4e752": {
+    "decl": "Scenario: SPME-real JIT fragment force matches the closed-form within 1e-5 under f32 (Hastings is accurate enough)",
+    "file": "forces/spme",
+    "refs": [],
+    "title": "SPME-real JIT fragment force matches the closed-form within 1e-5 under f32 (Hastings is accurate enough)",
+    "type": "scenario"
+  },
+  "rq-0fbfc03f": {
+    "decl": "Scenario: Force result is invariant under construction-write-order",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Force result is invariant under construction-write-order",
+    "type": "scenario"
   },
   "rq-0fcb5a1e": {
     "decl": "Scenario: [barostat] kind = \"berendsen\" with all required fields accepted",
@@ -2026,6 +2106,13 @@
     "title": "Pre-flight refuses to overwrite an existing timings file",
     "type": "scenario"
   },
+  "rq-111eb26d": {
+    "decl": "Scenario: max_neighbors in config is rejected at load",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "max_neighbors in config is rejected at load",
+    "type": "scenario"
+  },
   "rq-1148ddc5": {
     "decl": "Scenario: Bit-exact pipeline reproducibility in the default build",
     "file": "precision",
@@ -2072,6 +2159,13 @@
     ],
     "title": "Barostat",
     "type": "api-item"
+  },
+  "rq-118a47d5": {
+    "decl": "Scenario: LJ with a uniform type_cutoff table reports CutoffHandling::Uniform",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "LJ with a uniform type_cutoff table reports CutoffHandling::Uniform",
+    "type": "scenario"
   },
   "rq-119cbe46": {
     "decl": "### `.minlog` format",
@@ -2341,10 +2435,10 @@
     "type": "scenario"
   },
   "rq-13c02457": {
-    "decl": "# Feature: Lennard-Jones Pair Force Kernel",
+    "decl": "# Feature: Lennard-Jones Pair Force",
     "file": "forces/lj-pair-force",
     "refs": [],
-    "title": "Feature: Lennard-Jones Pair Force Kernel",
+    "title": "Feature: Lennard-Jones Pair Force",
     "type": "file"
   },
   "rq-13ca0415": {
@@ -2396,7 +2490,7 @@
     "type": "scenario"
   },
   "rq-14033af1": {
-    "decl": "- `NeighborListState::new_cell_list(device: Arc<CudaDevice>, sim_box: &SimulationBox, particle_count: usize, r_cut: f32, max_neighbors: u32, r_skin: f32) -> Result<NeighborListState, NeighborListError>`",
+    "decl": "- `NeighborListState::new_cell_list(device: Arc<CudaDevice>, sim_box: &SimulationBox, particle_count: usize, r_cut: f32, r_skin: f32, tile_pair_config: TilePairCapacityConfig) -> Result<NeighborListState, NeighborListError>`",
     "file": "forces/neighbor-list",
     "refs": [
       {
@@ -2438,6 +2532,20 @@
     ],
     "title": "Minimizer",
     "type": "api-item"
+  },
+  "rq-146221cb": {
+    "decl": "Scenario: Scatter runs every step regardless of rebuild",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Scatter runs every step regardless of rebuild",
+    "type": "scenario"
+  },
+  "rq-1470ef9f": {
+    "decl": "Scenario: interacting_atoms entries contain only real neighbours",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "interacting_atoms entries contain only real neighbours",
+    "type": "scenario"
   },
   "rq-147f5ea6": {
     "decl": "# Atom indices are 0-based and refer to entries in the init file.",
@@ -2511,12 +2619,7 @@
   "rq-151cb099": {
     "decl": "Scenario: Cell index of a position at the +1/2 fractional-coordinate boundary clamps inside the grid",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Cell index of a position at the +1/2 fractional-coordinate boundary clamps inside the grid",
     "type": "scenario"
   },
@@ -2556,6 +2659,13 @@
     ],
     "title": "Per-Step Kernel Sequence",
     "type": "section"
+  },
+  "rq-15a42b50": {
+    "decl": "Scenario: SPME-real and LJ in-cutoff pair force matches the closed form within f32 round-off",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "SPME-real and LJ in-cutoff pair force matches the closed form within f32 round-off",
+    "type": "scenario"
   },
   "rq-15b050fb": {
     "decl": "## Out of Scope",
@@ -2654,6 +2764,13 @@
     "title": "SimulationBox API",
     "type": "section"
   },
+  "rq-169e1d84": {
+    "decl": "- `find_blocks_with_interactions(sorted_blocks,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "find_blocks_with_interactions",
+    "type": "api-item"
+  },
   "rq-16dc6d77": {
     "decl": "Scenario: step(ForcesOnly) launches the _f variant; step(ForcesAndScalars) launches the _fev variant",
     "file": "forces/jit-composed-pair-force",
@@ -2666,13 +2783,6 @@
     "file": "forces/jit-composed-intramolecular",
     "refs": [],
     "title": "step() with two bonded slots launches the bonded composed kernel twice",
-    "type": "scenario"
-  },
-  "rq-1708fc0a": {
-    "decl": "Scenario: Pair-force kernels declare no shared memory",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Pair-force kernels declare no shared memory",
     "type": "scenario"
   },
   "rq-1727d6bd": {
@@ -2882,6 +2992,14 @@
     "title": "Types",
     "type": "section"
   },
+  "rq-18847c46": {
+    "decl": "### Diagonal Shuffle",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Diagonal Shuffle",
+    "type": "section"
+  },
   "rq-18f5ef7a": {
     "decl": "Scenario: Constraint group adds implicit exclusions for every intra-group pair",
     "file": "integration/constraint-framework",
@@ -2976,12 +3094,7 @@
   "rq-19fd5b09": {
     "decl": "Scenario: cell_counts is the device-computed per-cell histogram",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cell_counts is the device-computed per-cell histogram",
     "type": "scenario"
   },
@@ -3187,12 +3300,7 @@
   "rq-1b44b5da": {
     "decl": "Scenario: Lossy 100-step round trip does NOT restore observables",
     "file": "pipeline-reversibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Lossy 100-step round trip does NOT restore observables",
     "type": "scenario"
   },
@@ -3230,12 +3338,7 @@
   "rq-1b742a37": {
     "decl": "Scenario: cached_generation initialised from the construction-time box",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cached_generation initialised from the construction-time box",
     "type": "scenario"
   },
@@ -3286,14 +3389,17 @@
   "rq-1b9c474c": {
     "decl": "Scenario: Reject configurations whose box admits fewer than 3 cells along any direction",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Reject configurations whose box admits fewer than 3 cells along any direction",
     "type": "scenario"
+  },
+  "rq-1bab5b76": {
+    "decl": "## Scope",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Scope",
+    "type": "section"
   },
   "rq-1babd195": {
     "decl": "Scenario: Per-pair contributions are summed in canonical slot order before the warp tree",
@@ -3437,6 +3543,14 @@
     "title": "Atom with no bonds gets zero accumulator",
     "type": "scenario"
   },
+  "rq-1ccb6e53": {
+    "decl": "#### Box-Geometry Transitions",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 4,
+    "refs": [],
+    "title": "Box-Geometry Transitions",
+    "type": "section"
+  },
   "rq-1ce4ce5a": {
     "decl": "Scenario: Atom with two bonds receives sum of contributions",
     "file": "forces/morse-bonded",
@@ -3472,12 +3586,7 @@
     "decl": "## Reversal Protocol",
     "file": "pipeline-reversibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Reversal Protocol",
     "type": "section"
   },
@@ -3508,13 +3617,6 @@
     "refs": [],
     "title": "File Format",
     "type": "section"
-  },
-  "rq-1e135c50": {
-    "decl": "Scenario: Particle count that is not a multiple of WARPS_PER_BLOCK uses a ragged final block",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Particle count that is not a multiple of WARPS_PER_BLOCK uses a ragged final block",
-    "type": "scenario"
   },
   "rq-1e1b4e02": {
     "decl": "### Exclusion list",
@@ -3973,6 +4075,14 @@
     "title": "Types",
     "type": "section"
   },
+  "rq-21131a60": {
+    "decl": "## Neighbour List",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Neighbour List",
+    "type": "section"
+  },
   "rq-214639c9": {
     "decl": "Scenario: from_config populates r_switch from the parsed PairInteractionConfig",
     "file": "forces/lj-pair-force",
@@ -4170,12 +4280,7 @@
   "rq-2303ee2e": {
     "decl": "Scenario: Per-cell sort yields ascending partner indices inside every cell",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Per-cell sort yields ascending partner indices inside every cell",
     "type": "scenario"
   },
@@ -4370,12 +4475,7 @@
     "decl": "## Comparison Procedure",
     "file": "pipeline-reproducibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Comparison Procedure",
     "type": "section"
   },
@@ -4455,6 +4555,13 @@
     "title": "Coulomb force is C¹ continuous at r_switch",
     "type": "scenario"
   },
+  "rq-25515b9a": {
+    "decl": "- `__device__ static inline void",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "__device__",
+    "type": "api-item"
+  },
   "rq-256287cb": {
     "decl": "Scenario: SubStep::ForceEval { class: Some(Fast) } dispatches to step_class(Fast)",
     "file": "forces/framework",
@@ -4522,12 +4629,7 @@
   "rq-25faef11": {
     "decl": "Scenario: Neighbor list applies minimum-image PBC",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Neighbor list applies minimum-image PBC",
     "type": "scenario"
   },
@@ -4542,6 +4644,14 @@
     ],
     "title": "minimum_image of a displacement that requires b-tilt cancellation",
     "type": "scenario"
+  },
+  "rq-2647cb7e": {
+    "decl": "### CUDA Kernels",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "CUDA Kernels",
+    "type": "section"
   },
   "rq-264d2234": {
     "decl": "Scenario: record_host with a HostStage not in ORDER panics",
@@ -4570,12 +4680,7 @@
   "rq-265f4da4": {
     "decl": "Scenario: scatter places each atom inside its cell's slice",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "scatter places each atom inside its cell's slice",
     "type": "scenario"
   },
@@ -4696,6 +4801,14 @@
     "title": "SI-mode .xyz velocities are converted to atomic-unit velocity",
     "type": "scenario"
   },
+  "rq-27525d3c": {
+    "decl": "### JIT fragment behaviour",
+    "file": "forces/spme",
+    "level": 3,
+    "refs": [],
+    "title": "JIT fragment behaviour",
+    "type": "section"
+  },
   "rq-27c19b67": {
     "decl": "Scenario: ForcesOnly call preserves the energy and virial accumulator entries from the previous ForcesAndScalars call",
     "file": "forces/framework",
@@ -4761,12 +4874,7 @@
   "rq-2846ee8b": {
     "decl": "Scenario: Bit-exact equality after a 100-step run",
     "file": "pipeline-reproducibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Bit-exact equality after a 100-step run",
     "type": "scenario"
   },
@@ -4801,13 +4909,6 @@
     ],
     "title": "Rescale preserves COM momentum",
     "type": "scenario"
-  },
-  "rq-28815c89": {
-    "decl": "- `coulomb_pair_force_f`, `coulomb_pair_force_fev` — see",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "coulomb_pair_force_f",
-    "type": "api-item"
   },
   "rq-28967c97": {
     "decl": "Scenario: f64 build trajectory writer emits 17-digit columns",
@@ -4901,6 +5002,13 @@
     "title": "init_device fails when no GPU is available",
     "type": "scenario"
   },
+  "rq-299ea1de": {
+    "decl": "Scenario: SPME-real JIT fragment evaluates erfc via Real_erfc under f64",
+    "file": "forces/spme",
+    "refs": [],
+    "title": "SPME-real JIT fragment evaluates erfc via Real_erfc under f64",
+    "type": "scenario"
+  },
   "rq-29bdf2b2": {
     "decl": "### Self-energy",
     "file": "forces/spme",
@@ -4947,6 +5055,13 @@
       }
     ],
     "title": "Two independent lossless runs produce byte-identical results",
+    "type": "scenario"
+  },
+  "rq-2a1f2043": {
+    "decl": "Scenario: SPME-real JIT fragment evaluates erfc via the Hastings polynomial under f32",
+    "file": "forces/spme",
+    "refs": [],
+    "title": "SPME-real JIT fragment evaluates erfc via the Hastings polynomial under f32",
     "type": "scenario"
   },
   "rq-2a30cf81": {
@@ -5047,14 +5162,6 @@
     "title": "TrajectoryWriter",
     "type": "api-item"
   },
-  "rq-2adca0ab": {
-    "decl": "## Device-side Pair Compute Helper",
-    "file": "forces/pair-force-kernel",
-    "level": 2,
-    "refs": [],
-    "title": "Device-side Pair Compute Helper",
-    "type": "section"
-  },
   "rq-2adf8b58": {
     "decl": "Scenario: Accept negative target pressure",
     "file": "integration/berendsen-barostat",
@@ -5151,6 +5258,13 @@
     "title": "Exclusion scale NaN rejected",
     "type": "scenario"
   },
+  "rq-2b605fa8": {
+    "decl": "Scenario: AggregateLevel::ForcesAndScalars selects the _fev entry point",
+    "file": "forces/pair-force-kernel",
+    "refs": [],
+    "title": "AggregateLevel::ForcesAndScalars selects the _fev entry point",
+    "type": "scenario"
+  },
   "rq-2bbc4121": {
     "decl": "Scenario: Construct with matching arrays and explicit unique IDs",
     "file": "particle-state",
@@ -5166,12 +5280,7 @@
   "rq-2bc559ec": {
     "decl": "Scenario: Each atom's neighbor list is emitted in cell-sweep order",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Each atom's neighbor list is emitted in cell-sweep order",
     "type": "scenario"
   },
@@ -5234,6 +5343,13 @@
     ],
     "title": "ParticleBuffers carries the image-flag device buffers",
     "type": "scenario"
+  },
+  "rq-2c323eaa": {
+    "decl": "- `finalize_slow_class_forces` (analogous, when slow class uses",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "finalize_slow_class_forces",
+    "type": "api-item"
   },
   "rq-2c6de27d": {
     "decl": "- `AndersenThermostat::draw_counter_device: CudaSlice<u64>`",
@@ -5349,13 +5465,6 @@
       }
     ],
     "title": "C-rescale composes with langevin-baoab",
-    "type": "scenario"
-  },
-  "rq-2d299ffa": {
-    "decl": "Scenario: NaN per-pair contribution propagates to NaN per-particle output",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "NaN per-pair contribution propagates to NaN per-particle output",
     "type": "scenario"
   },
   "rq-2d2eaf72": {
@@ -5593,6 +5702,13 @@
     "title": "vv_kick leaves velocity unchanged when force is zero",
     "type": "scenario"
   },
+  "rq-2f77077b": {
+    "decl": "Scenario: Full block bbox spans all 32 atoms",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Full block bbox spans all 32 atoms",
+    "type": "scenario"
+  },
   "rq-2f9b0e01": {
     "decl": "Scenario: A group whose declared atoms field exceeds MAX_GROUP_ATOMS is rejected at config load",
     "file": "integration/shake",
@@ -5693,6 +5809,13 @@
     "title": "supports_constraints == false suppresses all hook insertion",
     "type": "scenario"
   },
+  "rq-30a85bc9": {
+    "decl": "Scenario: excluded_pair_atoms is constant across the simulation",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "excluded_pair_atoms is constant across the simulation",
+    "type": "scenario"
+  },
   "rq-30c21c70": {
     "decl": "- `LintOverall` — `enum { Ok, Fail }`. `LintReport::overall` is `Ok`",
     "file": "simulation-runner",
@@ -5720,12 +5843,7 @@
   "rq-30f85829": {
     "decl": "Scenario: Trivial-mode state has no cell-list fields",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Trivial-mode state has no cell-list fields",
     "type": "scenario"
   },
@@ -5806,12 +5924,7 @@
   "rq-31a9e3bb": {
     "decl": "Scenario: r_search_sq is preserved across a generation refresh",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "r_search_sq is preserved across a generation refresh",
     "type": "scenario"
   },
@@ -5850,12 +5963,7 @@
   "rq-3288a78c": {
     "decl": "Scenario: NPT-style sequence of small barostat ticks rebuilds at the displacement-driven rate",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "NPT-style sequence of small barostat ticks rebuilds at the displacement-driven rate",
     "type": "scenario"
   },
@@ -5910,12 +6018,7 @@
   "rq-331b6e81": {
     "decl": "Scenario: cell_offsets is not reallocated when n_cells_total is unchanged",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cell_offsets is not reallocated when n_cells_total is unchanged",
     "type": "scenario"
   },
@@ -5966,11 +6069,11 @@
     "type": "section"
   },
   "rq-33aa3e1d": {
-    "decl": "## Neighbor List Construction",
+    "decl": "## Packed-Neighbour List Construction",
     "file": "forces/neighbor-list",
     "level": 2,
     "refs": [],
-    "title": "Neighbor List Construction",
+    "title": "Packed-Neighbour List Construction",
     "type": "section"
   },
   "rq-33b1f2d2": {
@@ -6204,12 +6307,7 @@
   "rq-35981c27": {
     "decl": "Scenario: First displacement_check call always rebuilds (needs_rebuild starts true)",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "First displacement_check call always rebuilds (needs_rebuild starts true)",
     "type": "scenario"
   },
@@ -6367,6 +6465,13 @@
     "title": "Lint reports a pre-existing output file under the output paths stage",
     "type": "scenario"
   },
+  "rq-37c40c51": {
+    "decl": "- `CutoffHandling` — declares whether a fragment uses one cutoff <!-- rq-cuthand -->",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "CutoffHandling",
+    "type": "api-item"
+  },
   "rq-37ccfc1f": {
     "decl": "## Gherkin Scenarios",
     "file": "forces/framework",
@@ -6392,6 +6497,13 @@
     "file": "forces/lj-pair-force",
     "refs": [],
     "title": "Per-pair-type r_switch dispatches correctly",
+    "type": "scenario"
+  },
+  "rq-38096442": {
+    "decl": "Scenario: tile_pair_growth_factor below 1.0 is rejected at load",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "tile_pair_growth_factor below 1.0 is rejected at load",
     "type": "scenario"
   },
   "rq-38117e33": {
@@ -6613,18 +6725,6 @@
     "title": "check_min_perpendicular_width flags direction \"a\" when w_a fails",
     "type": "scenario"
   },
-  "rq-3982aff8": {
-    "decl": "Scenario: Result of any pair-force kernel agrees with a CPU warp-tree reference exactly",
-    "file": "forces/pair-force-kernel",
-    "refs": [
-      {
-        "file": "tests/pair_force_kernel.rs",
-        "kind": "code"
-      }
-    ],
-    "title": "Result of any pair-force kernel agrees with a CPU warp-tree reference exactly",
-    "type": "scenario"
-  },
   "rq-39891001": {
     "decl": "### Functions",
     "file": "io/config-schema",
@@ -6680,6 +6780,13 @@
     "refs": [],
     "title": "Scale = 1.0 is equivalent to no exclusion",
     "type": "scenario"
+  },
+  "rq-3a31b3f0": {
+    "decl": "- `crate::gpu::compute_block_bbox(kernels, tile_sorted_posq,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "crate",
+    "type": "api-item"
   },
   "rq-3a41a142": {
     "decl": "- `spme_recip_reduce_partials`: single block of 256 threads,",
@@ -7049,11 +7156,18 @@
     "type": "section"
   },
   "rq-3dc94856": {
-    "decl": "Scenario: spme_spread_fixed_point issues exactly N · p³ atomicAdd<i64> operations",
+    "decl": "Scenario: spme_spread_fixed_point issues at most N · p³ atomicAdd<i64> operations",
     "file": "forces/spme",
     "refs": [],
-    "title": "spme_spread_fixed_point issues exactly N · p³ atomicAdd<i64> operations",
+    "title": "spme_spread_fixed_point issues at most N · p³ atomicAdd<i64> operations",
     "type": "scenario"
+  },
+  "rq-3ddf259b": {
+    "decl": "- `heddle_jit_composed_pair_force_single_f` /",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "heddle_jit_composed_pair_force_single_f",
+    "type": "api-item"
   },
   "rq-3de16ce0": {
     "decl": "Scenario: Construct a ForceField with LennardJones and MorseBonded",
@@ -7215,13 +7329,6 @@
     "title": "Append rows in source order",
     "type": "scenario"
   },
-  "rq-3f01c5c9": {
-    "decl": "Scenario: _fev variant writes the energy and virial slot output rows",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "_fev variant writes the energy and virial slot output rows",
-    "type": "scenario"
-  },
   "rq-3f01c746": {
     "decl": "Scenario: bond_type unknown potential is rejected",
     "file": "io/config-schema",
@@ -7250,12 +7357,7 @@
   "rq-3f46fb2e": {
     "decl": "Scenario: All output values are finite after the 100-step run",
     "file": "pipeline-reproducibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "All output values are finite after the 100-step run",
     "type": "scenario"
   },
@@ -7272,6 +7374,13 @@
     "refs": [],
     "title": "The atom-listing order is preserved verbatim: algorithm-specific",
     "type": "file"
+  },
+  "rq-3fbb8dea": {
+    "decl": "- `NeighborListConfig` carries the fields documented under",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "NeighborListConfig",
+    "type": "api-item"
   },
   "rq-3fdb7e01": {
     "decl": "- `NamedSlotConfig` — open-shaped parsed entry for the",
@@ -7316,6 +7425,13 @@
     ],
     "title": "TrajectoryWriter",
     "type": "api-item"
+  },
+  "rq-40b8dfb2": {
+    "decl": "Scenario: Newton's 3rd is observed",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Newton's 3rd is observed",
+    "type": "scenario"
   },
   "rq-40dd09ae": {
     "decl": "Scenario: Reject `between` referencing a type with zero particles",
@@ -7379,6 +7495,14 @@
     "level": 2,
     "refs": [],
     "title": "RNG",
+    "type": "section"
+  },
+  "rq-412fea28": {
+    "decl": "#### Triclinic Boxes",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 4,
+    "refs": [],
+    "title": "Triclinic Boxes",
     "type": "section"
   },
   "rq-41389685": {
@@ -7448,6 +7572,13 @@
     "title": "Integrator",
     "type": "api-item"
   },
+  "rq-41ba5dca": {
+    "decl": "- `heddle_jit_composed_pair_force_correct_f` /",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "heddle_jit_composed_pair_force_correct_f",
+    "type": "api-item"
+  },
   "rq-41eb5e02": {
     "decl": "#### Other attributes",
     "file": "io/init-state-file",
@@ -7495,6 +7626,13 @@
     "title": "FragmentCompileFailed",
     "type": "api-item"
   },
+  "rq-42e29605": {
+    "decl": "- `heddle_jit_composed_pair_force_f` /",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "heddle_jit_composed_pair_force_f",
+    "type": "api-item"
+  },
   "rq-4300cafc": {
     "decl": "Scenario: plan(dt) is pure; it does not launch kernels or touch buffers",
     "file": "integration/framework",
@@ -7505,6 +7643,13 @@
       }
     ],
     "title": "plan(dt) is pure; it does not launch kernels or touch buffers",
+    "type": "scenario"
+  },
+  "rq-432c52f5": {
+    "decl": "Scenario: Triclinic boxes are SPC-ineligible regardless of bbox extent",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Triclinic boxes are SPC-ineligible regardless of bbox extent",
     "type": "scenario"
   },
   "rq-433c972f": {
@@ -7557,13 +7702,6 @@
     "refs": [],
     "title": "Build Script",
     "type": "section"
-  },
-  "rq-43b88a11": {
-    "decl": "Scenario: init_device exposes both kernel variants on every pair-force Kernels field",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "init_device exposes both kernel variants on every pair-force Kernels field",
-    "type": "scenario"
   },
   "rq-43e44a28": {
     "decl": "## Diagnostic log columns",
@@ -7952,13 +8090,6 @@
     "title": "Types",
     "type": "section"
   },
-  "rq-4864c156": {
-    "decl": "Scenario: Pair (i, j) and (j, i) contributions are opposite for non-boundary displacements",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Pair (i, j) and (j, i) contributions are opposite for non-boundary displacements",
-    "type": "scenario"
-  },
   "rq-4894ae09": {
     "decl": "Scenario: apply on empty state is a no-op",
     "file": "integration/c-rescale-barostat",
@@ -7969,6 +8100,20 @@
       }
     ],
     "title": "apply on empty state is a no-op",
+    "type": "scenario"
+  },
+  "rq-4896a257": {
+    "decl": "- `NeighborListState::rebuild` (existing) extends to call the",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "NeighborListState",
+    "type": "api-item"
+  },
+  "rq-48a014ed": {
+    "decl": "Scenario: Full block carries lane mask 0xFFFFFFFF",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Full block carries lane mask 0xFFFFFFFF",
     "type": "scenario"
   },
   "rq-48d14580": {
@@ -8058,13 +8203,6 @@
     "title": "Reject missing comment line",
     "type": "scenario"
   },
-  "rq-49cdbd88": {
-    "decl": "Scenario: Two independent runs of any pair-force kernel produce byte-identical output",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Two independent runs of any pair-force kernel produce byte-identical output",
-    "type": "scenario"
-  },
   "rq-49e26627": {
     "decl": "Scenario: trajectory frames do not include velocity columns even when velocities are present",
     "file": "minimization/steepest-descent",
@@ -8076,6 +8214,14 @@
     ],
     "title": "trajectory frames do not include velocity columns even when velocities are present",
     "type": "scenario"
+  },
+  "rq-49f2304c": {
+    "decl": "### Helper Functions in the JIT-Composed Source",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Helper Functions in the JIT-Composed Source",
+    "type": "section"
   },
   "rq-4a0c5f2e": {
     "decl": "- `PhaseKind` — runtime-level discriminated union over the unified",
@@ -8154,7 +8300,7 @@
     "type": "section"
   },
   "rq-4a8de06c": {
-    "decl": "- `ParticleBuffers` — device-side mirror. Holds a `CudaSlice<f32>` for each",
+    "decl": "- `ParticleBuffers` — device-side mirror. Holds `posq:",
     "file": "particle-state",
     "refs": [
       {
@@ -8195,6 +8341,14 @@
     "level": 3,
     "refs": [],
     "title": "Exclusion entries",
+    "type": "section"
+  },
+  "rq-4b20b449": {
+    "decl": "#### Per-Block Eligibility Predicate",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 4,
+    "refs": [],
+    "title": "Per-Block Eligibility Predicate",
     "type": "section"
   },
   "rq-4b38148c": {
@@ -8279,12 +8433,7 @@
   "rq-4bc8028f": {
     "decl": "Scenario: NeighborListState with particle_count = 0 builds successfully",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "NeighborListState with particle_count = 0 builds successfully",
     "type": "scenario"
   },
@@ -8567,6 +8716,14 @@
     "title": "Types",
     "type": "section"
   },
+  "rq-4f6fbfcb": {
+    "decl": "## Sorted-Blocks-by-Volume",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Sorted-Blocks-by-Volume",
+    "type": "section"
+  },
   "rq-4f78f4a2": {
     "decl": "Scenario: Duplicate bond rejected (same canonical pair)",
     "file": "forces/topology",
@@ -8775,6 +8932,14 @@
     "title": "compute_kinetic_energy",
     "type": "api-item"
   },
+  "rq-512037ca": {
+    "decl": "## Tile-Sorted Posq View",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Tile-Sorted Posq View",
+    "type": "section"
+  },
   "rq-5137c6f5": {
     "decl": "Scenario: SI-mode lattice components are converted to Bohr",
     "file": "io/init-state-file",
@@ -8831,13 +8996,6 @@
     "title": "Sub-step Execution",
     "type": "section"
   },
-  "rq-5241686b": {
-    "decl": "Scenario: Kernel does not modify positions, velocities, or masses",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Kernel does not modify positions, velocities, or masses",
-    "type": "scenario"
-  },
   "rq-5269221c": {
     "decl": "Scenario: wrap_position is idempotent for a triclinic box",
     "file": "simulation-box",
@@ -8848,6 +9006,13 @@
       }
     ],
     "title": "wrap_position is idempotent for a triclinic box",
+    "type": "scenario"
+  },
+  "rq-527d3e7c": {
+    "decl": "Scenario: Per-block SPC predicate is false when any axis margin drops below MAX_CUTOFF",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Per-block SPC predicate is false when any axis margin drops below MAX_CUTOFF",
     "type": "scenario"
   },
   "rq-529b2c5f": {
@@ -8924,12 +9089,7 @@
   "rq-52f547fd": {
     "decl": "Scenario: NeighborListState with particle_count = 1 produces an empty neighbor list",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "NeighborListState with particle_count = 1 produces an empty neighbor list",
     "type": "scenario"
   },
@@ -9073,12 +9233,7 @@
   "rq-53ae77a4": {
     "decl": "Scenario: Displacement check on reference positions equal to current returns 0",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Displacement check on reference positions equal to current returns 0",
     "type": "scenario"
   },
@@ -9136,6 +9291,13 @@
     "title": "Performance Notes",
     "type": "section"
   },
+  "rq-54aec894": {
+    "decl": "Scenario: Packed-neighbour pass dispatches to the no-exclusion evaluator",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Packed-neighbour pass dispatches to the no-exclusion evaluator",
+    "type": "scenario"
+  },
   "rq-54b99519": {
     "decl": "## RNG",
     "file": "integration/csvr",
@@ -9181,13 +9343,6 @@
     "file": "forces/lj-pair-force",
     "refs": [],
     "title": "Different-type same-pair Newton's third law holds for symmetric tables",
-    "type": "scenario"
-  },
-  "rq-5568bd21": {
-    "decl": "Scenario: count == 0 yields zero per-particle output",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "count == 0 yields zero per-particle output",
     "type": "scenario"
   },
   "rq-556b7c13": {
@@ -9266,6 +9421,13 @@
     "title": "SimulationSetup::new and lint --with-gpu invoke the same step helpers",
     "type": "scenario"
   },
+  "rq-560d3be9": {
+    "decl": "Scenario: Dense (i-block, j-block) candidate routes its hits to interacting_atoms",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Dense (i-block, j-block) candidate routes its hits to interacting_atoms",
+    "type": "scenario"
+  },
   "rq-560dffb8": {
     "decl": "Scenario: Reject duplicate type names",
     "file": "io/config-schema",
@@ -9300,6 +9462,13 @@
       }
     ],
     "title": "Frames at distances >= r_max do not contribute",
+    "type": "scenario"
+  },
+  "rq-5631e383": {
+    "decl": "Scenario: Partial last block carries truncated lane mask",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Partial last block carries truncated lane mask",
     "type": "scenario"
   },
   "rq-56364532": {
@@ -9450,6 +9619,13 @@
       }
     ],
     "title": "topology absolute path is preserved",
+    "type": "scenario"
+  },
+  "rq-578a4020": {
+    "decl": "Scenario: Conversion preserves f32 precision in the typical range",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Conversion preserves f32 precision in the typical range",
     "type": "scenario"
   },
   "rq-57a0f297": {
@@ -9662,13 +9838,12 @@
     "title": "Temperature for a 3-atom SETTLE'd water (one rigid molecule, COM removed)",
     "type": "scenario"
   },
-  "rq-5946ee09": {
-    "decl": "## Launch Configuration Constants",
-    "file": "forces/pair-force-kernel",
-    "level": 2,
+  "rq-595e7ea4": {
+    "decl": "- `crate::gpu::scatter_positions_to_tile_order(kernels, buffers,",
+    "file": "forces/packed-neighbour-pair-force",
     "refs": [],
-    "title": "Launch Configuration Constants",
-    "type": "section"
+    "title": "crate",
+    "type": "api-item"
   },
   "rq-5985846f": {
     "decl": "Scenario: step(ForcesOnly) updates forces and leaves potential_energies / virials stale",
@@ -9752,6 +9927,13 @@
     "title": "A symplectic integrator emits ForceEval with ForcesOnly by default",
     "type": "scenario"
   },
+  "rq-5a7f78c4": {
+    "decl": "- `crate::gpu::finalize_fast_class_forces(kernels, fp_buffers,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "crate",
+    "type": "api-item"
+  },
   "rq-5a89475f": {
     "decl": "### cuFFT precision selection",
     "file": "precision",
@@ -9787,6 +9969,13 @@
     "refs": [],
     "title": "Empty state",
     "type": "section"
+  },
+  "rq-5aee0b50": {
+    "decl": "Scenario: Two GPU runs produce byte-identical per-particle forces",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Two GPU runs produce byte-identical per-particle forces",
+    "type": "scenario"
   },
   "rq-5aeec526": {
     "decl": "Scenario: run_minimization_phase from a constructed setup matches the orchestrator",
@@ -9827,6 +10016,13 @@
     "file": "forces/spme",
     "refs": [],
     "title": "rho_fixed is zeroed at the start of every step",
+    "type": "scenario"
+  },
+  "rq-5b560577": {
+    "decl": "Scenario: Fixed-point buffers are zeroed at the start of every force evaluation",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Fixed-point buffers are zeroed at the start of every force evaluation",
     "type": "scenario"
   },
   "rq-5b934ecd": {
@@ -9904,6 +10100,13 @@
     ],
     "title": "RunSummary",
     "type": "api-item"
+  },
+  "rq-5c26c1ff": {
+    "decl": "Scenario: LJ JIT fragment elides the switching code when every pair-type sets r_switch = cutoff",
+    "file": "forces/lj-pair-force",
+    "refs": [],
+    "title": "LJ JIT fragment elides the switching code when every pair-type sets r_switch = cutoff",
+    "type": "scenario"
   },
   "rq-5c28eee0": {
     "decl": "Scenario: [thermostat] kind = \"csvr\" requires a seed",
@@ -9986,6 +10189,14 @@
     ],
     "title": "Reject a thermostat under [[minimization]]",
     "type": "scenario"
+  },
+  "rq-5ce17997": {
+    "decl": "### Single-Periodic-Copy Fast Path",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Single-Periodic-Copy Fast Path",
+    "type": "section"
   },
   "rq-5d18fa01": {
     "decl": "Scenario: shake_positions updates half-step velocities consistently with the position correction",
@@ -10154,13 +10365,6 @@
     "title": "SimulationBox",
     "type": "api-item"
   },
-  "rq-5e2ee310": {
-    "decl": "Scenario: Sweep reads only slots [0, count) and ignores trailing junk",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Sweep reads only slots [0, count) and ignores trailing junk",
-    "type": "scenario"
-  },
   "rq-5e5f48da": {
     "decl": "Scenario: runner.resolve_level falls through to ForcesOnly when neither logging",
     "file": "integration/framework",
@@ -10255,12 +10459,7 @@
   "rq-5f2c42be": {
     "decl": "Scenario: Prefix scan is correct for cell counts beyond a single block-totals pass",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Prefix scan is correct for cell counts beyond a single block-totals pass",
     "type": "scenario"
   },
@@ -10383,6 +10582,13 @@
     "title": "Out of Scope",
     "type": "section"
   },
+  "rq-6060a744": {
+    "decl": "Scenario: LJ JIT fragment with uniform cutoff reports CutoffHandling::Uniform",
+    "file": "forces/lj-pair-force",
+    "refs": [],
+    "title": "LJ JIT fragment with uniform cutoff reports CutoffHandling::Uniform",
+    "type": "scenario"
+  },
   "rq-606197d5": {
     "decl": "### Cadence",
     "file": "io/log-output",
@@ -10402,6 +10608,14 @@
     ],
     "title": "Config",
     "type": "api-item"
+  },
+  "rq-6083409b": {
+    "decl": "## Force Kernel",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Force Kernel",
+    "type": "section"
   },
   "rq-6098e0c1": {
     "decl": "Scenario: One particle's contribution at a single cell matches the fixed-point B-spline value",
@@ -10651,19 +10865,19 @@
     "title": "NoseHooverChainThermostat",
     "type": "api-item"
   },
-  "rq-63608bb9": {
-    "decl": "Scenario: Sweep loop runs three full iterations when count is an exact multiple of WARP_SIZE",
-    "file": "forces/pair-force-kernel",
+  "rq-62f00166": {
+    "decl": "- `sort_blocks_by_volume(sorted_blocks, n_blocks)` — radix sort.",
+    "file": "forces/packed-neighbour-pair-force",
     "refs": [],
-    "title": "Sweep loop runs three full iterations when count is an exact multiple of WARP_SIZE",
-    "type": "scenario"
+    "title": "sort_blocks_by_volume",
+    "type": "api-item"
   },
   "rq-63726e30": {
-    "decl": "## Launch Configuration",
+    "decl": "## Launch Configuration Constants",
     "file": "forces/pair-force-kernel",
     "level": 2,
     "refs": [],
-    "title": "Launch Configuration",
+    "title": "Launch Configuration Constants",
     "type": "section"
   },
   "rq-637c4fdd": {
@@ -11081,6 +11295,14 @@
     "title": "init_device exposes the Morse kernels on the Kernels handle",
     "type": "scenario"
   },
+  "rq-67a09135": {
+    "decl": "### Capacity",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Capacity",
+    "type": "section"
+  },
   "rq-67c5a863": {
     "decl": "Scenario: Tilts may be negative",
     "file": "simulation-box",
@@ -11192,12 +11414,12 @@
     "title": "Bond-force reduction sums energy and virial alongside forces",
     "type": "scenario"
   },
-  "rq-68b8b92a": {
-    "decl": "Scenario: Launcher with particle_count = 0 is a no-op",
-    "file": "forces/pair-force-kernel",
+  "rq-68a9602b": {
+    "decl": "- `crate::gpu::find_blocks_with_interactions(kernels, …) ->",
+    "file": "forces/packed-neighbour-pair-force",
     "refs": [],
-    "title": "Launcher with particle_count = 0 is a no-op",
-    "type": "scenario"
+    "title": "crate",
+    "type": "api-item"
   },
   "rq-68bdda7c": {
     "decl": "Scenario: Per-step launch loop unaffected by Phase 3 plumbing",
@@ -11227,7 +11449,7 @@
     "type": "section"
   },
   "rq-693ce6fa": {
-    "decl": "# Feature: Shared Neighbor List Service",
+    "decl": "# Feature: Cell-List Spatial Pre-Step",
     "file": "forces/neighbor-list",
     "refs": [
       {
@@ -11235,7 +11457,7 @@
         "kind": "code"
       }
     ],
-    "title": "Feature: Shared Neighbor List Service",
+    "title": "Feature: Cell-List Spatial Pre-Step",
     "type": "file"
   },
   "rq-69600add": {
@@ -11279,12 +11501,7 @@
   "rq-699cccff": {
     "decl": "Scenario: Two pre_steps after a single box mutation refresh only once",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Two pre_steps after a single box mutation refresh only once",
     "type": "scenario"
   },
@@ -11432,12 +11649,7 @@
     "decl": "## Velocity-Verlet Loop",
     "file": "pipeline-reproducibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Velocity-Verlet Loop",
     "type": "section"
   },
@@ -11498,12 +11710,7 @@
   "rq-6bf3709c": {
     "decl": "Scenario: Two independent rebuilds with identical positions produce identical lists",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Two independent rebuilds with identical positions produce identical lists",
     "type": "scenario"
   },
@@ -11570,12 +11777,7 @@
   "rq-6c8415f6": {
     "decl": "Scenario: NeighborListState rebuild performs no host-device particle transfers",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "NeighborListState rebuild performs no host-device particle transfers",
     "type": "scenario"
   },
@@ -11590,6 +11792,13 @@
     ],
     "title": "BerendsenBuilder",
     "type": "api-item"
+  },
+  "rq-6ca8a9c4": {
+    "decl": "Scenario: Partial block bbox ignores inactive lanes",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Partial block bbox ignores inactive lanes",
+    "type": "scenario"
   },
   "rq-6cac8251": {
     "decl": "# Column format: atom_i  atom_j  atom_k  angle_type_name",
@@ -11943,6 +12152,13 @@
     "title": "Default r_switch to 0.9 * cutoff when omitted",
     "type": "scenario"
   },
+  "rq-6f6fe328": {
+    "decl": "Scenario: LJ JIT fragment with mixed cutoffs reports CutoffHandling::PerPair",
+    "file": "forces/lj-pair-force",
+    "refs": [],
+    "title": "LJ JIT fragment with mixed cutoffs reports CutoffHandling::PerPair",
+    "type": "scenario"
+  },
   "rq-6f7ad4ad": {
     "decl": "## Gherkin Scenarios",
     "file": "integration/berendsen",
@@ -12009,12 +12225,7 @@
   "rq-6fd5167a": {
     "decl": "Scenario: Configuration exceeding the u32 cell-addressing limit is rejected at construction",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Configuration exceeding the u32 cell-addressing limit is rejected at construction",
     "type": "scenario"
   },
@@ -12237,12 +12448,7 @@
   "rq-72aae589": {
     "decl": "Scenario: Generation tick with unchanged n_cells_total updates the cache without forcing rebuild",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Generation tick with unchanged n_cells_total updates the cache without forcing rebuild",
     "type": "scenario"
   },
@@ -12253,6 +12459,13 @@
     "refs": [],
     "title": "Empty phase",
     "type": "section"
+  },
+  "rq-72de7711": {
+    "decl": "Scenario: AggregateLevel::ForcesOnly selects the _f entry point",
+    "file": "forces/pair-force-kernel",
+    "refs": [],
+    "title": "AggregateLevel::ForcesOnly selects the _f entry point",
+    "type": "scenario"
   },
   "rq-73054857": {
     "decl": "### Angle entries",
@@ -12284,6 +12497,13 @@
       }
     ],
     "title": "Construct with particle_count = 1 (N_f = 1)",
+    "type": "scenario"
+  },
+  "rq-7369ded0": {
+    "decl": "Scenario: Per-block SPC predicate is true when every axis margin exceeds MAX_CUTOFF",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Per-block SPC predicate is true when every axis margin exceeds MAX_CUTOFF",
     "type": "scenario"
   },
   "rq-73a3b802": {
@@ -12627,12 +12847,7 @@
     "decl": "## Test Fixture",
     "file": "pipeline-reversibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Test Fixture",
     "type": "section"
   },
@@ -12670,6 +12885,13 @@
       }
     ],
     "title": "Unknown top-level key is permitted",
+    "type": "scenario"
+  },
+  "rq-7646dd13": {
+    "decl": "Scenario: interacting_tiles overflow grows the buffer and re-runs construction",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "interacting_tiles overflow grows the buffer and re-runs construction",
     "type": "scenario"
   },
   "rq-765c96c5": {
@@ -12901,12 +13123,7 @@
   "rq-7822b88b": {
     "decl": "Scenario: 100-step lossless round trip restores observables bit-exactly",
     "file": "pipeline-reversibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "100-step lossless round trip restores observables bit-exactly",
     "type": "scenario"
   },
@@ -12968,12 +13185,7 @@
   "rq-789fcec9": {
     "decl": "Scenario: Trivial-mode contents",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Trivial-mode contents",
     "type": "scenario"
   },
@@ -13241,12 +13453,7 @@
   "rq-7a14d0d8": {
     "decl": "Scenario: per-cell sort canonicalises sorted_particle_ids",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "per-cell sort canonicalises sorted_particle_ids",
     "type": "scenario"
   },
@@ -13351,12 +13558,7 @@
     "decl": "## Lossless Velocity-Verlet Loop",
     "file": "pipeline-reversibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Lossless Velocity-Verlet Loop",
     "type": "section"
   },
@@ -13464,11 +13666,12 @@
     "type": "section"
   },
   "rq-7c59a571": {
-    "decl": "- `spme_real_pair_force_f`, `spme_real_pair_force_fev` — see",
+    "decl": "## Per-Potential Standalone Kernels",
     "file": "forces/pair-force-kernel",
+    "level": 2,
     "refs": [],
-    "title": "spme_real_pair_force_f",
-    "type": "api-item"
+    "title": "Per-Potential Standalone Kernels",
+    "type": "section"
   },
   "rq-7c6012c7": {
     "decl": "### Rust Launch Helpers",
@@ -13664,6 +13867,13 @@
     "title": "rattle_velocities preserves the centre-of-mass velocity",
     "type": "scenario"
   },
+  "rq-7e0df64f": {
+    "decl": "Scenario: LJ JIT fragment uses the composer-supplied inv_r and r",
+    "file": "forces/lj-pair-force",
+    "refs": [],
+    "title": "LJ JIT fragment uses the composer-supplied inv_r and r",
+    "type": "scenario"
+  },
   "rq-7e2c482a": {
     "decl": "# atom is the oxygen and the next two are the hydrogens).",
     "file": "forces/topology",
@@ -13816,6 +14026,13 @@
     "title": "Angle list",
     "type": "section"
   },
+  "rq-7fcd6e99": {
+    "decl": "Scenario: sorted_blocks is sorted by volume bin ascending",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "sorted_blocks is sorted by volume bin ascending",
+    "type": "scenario"
+  },
   "rq-7fcfceac": {
     "decl": "Scenario: Construct with particle_count = 0",
     "file": "integration/mtk-npt",
@@ -13881,6 +14098,13 @@
       }
     ],
     "title": "Reject row with infinite velocity",
+    "type": "scenario"
+  },
+  "rq-80c6a964": {
+    "decl": "Scenario: Fully-excluded pair nets to zero on the fixed-point accumulator",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Fully-excluded pair nets to zero on the fixed-point accumulator",
     "type": "scenario"
   },
   "rq-80dcfa97": {
@@ -14012,6 +14236,13 @@
     "title": "SI-mode steepest-descent minimizer params are converted",
     "type": "scenario"
   },
+  "rq-8253d3c4": {
+    "decl": "Scenario: interaction_count is reset at the start of every rebuild",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "interaction_count is reset at the start of every rebuild",
+    "type": "scenario"
+  },
   "rq-8259c9ca": {
     "decl": "Scenario: Reject zero lx",
     "file": "simulation-box",
@@ -14050,6 +14281,13 @@
     "refs": [],
     "title": "`analyze` subcommand",
     "type": "section"
+  },
+  "rq-828e1ea2": {
+    "decl": "Scenario: LJ JIT fragment with uniform cutoff produces the closed-form LJ force within f32 round-off",
+    "file": "forces/lj-pair-force",
+    "refs": [],
+    "title": "LJ JIT fragment with uniform cutoff produces the closed-form LJ force within f32 round-off",
+    "type": "scenario"
   },
   "rq-82acb52f": {
     "decl": "Scenario: combine_class_totals is a single-threaded write per output element",
@@ -14176,12 +14414,7 @@
   "rq-838acdee": {
     "decl": "Scenario: sorted_particle_ids sorts particles by (cell_index, particle_id)",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "sorted_particle_ids sorts particles by (cell_index, particle_id)",
     "type": "scenario"
   },
@@ -14229,7 +14462,7 @@
     "type": "api-item"
   },
   "rq-846bdb8b": {
-    "decl": "# Feature: Truncated Coulomb Pair Force Kernel",
+    "decl": "# Feature: Truncated Coulomb Pair Force",
     "file": "forces/coulomb-pair-force",
     "refs": [
       {
@@ -14253,7 +14486,7 @@
         "kind": "code"
       }
     ],
-    "title": "Feature: Truncated Coulomb Pair Force Kernel",
+    "title": "Feature: Truncated Coulomb Pair Force",
     "type": "file"
   },
   "rq-8471c200": {
@@ -14409,6 +14642,13 @@
     "title": "Philox uniform consumes two lanes per call in the f64 build",
     "type": "scenario"
   },
+  "rq-86cc8e5d": {
+    "decl": "Scenario: Single-pair pass is skipped when its count is zero",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Single-pair pass is skipped when its count is zero",
+    "type": "scenario"
+  },
   "rq-86dea9a1": {
     "decl": "Scenario: Thermostat's apply_post runs the scalar prep but not the rescale",
     "file": "integration/jit-composed-post-force",
@@ -14432,6 +14672,14 @@
     ],
     "title": "AnalysisBuilder",
     "type": "api-item"
+  },
+  "rq-86f757e0": {
+    "decl": "### Types",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Types",
+    "type": "section"
   },
   "rq-870a3aa5": {
     "decl": "Scenario: units field defaulting to SI when absent",
@@ -14541,12 +14789,7 @@
   "rq-882c9e86": {
     "decl": "Scenario: cached_generation initialised from a non-zero construction-time generation",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cached_generation initialised from a non-zero construction-time generation",
     "type": "scenario"
   },
@@ -14555,6 +14798,13 @@
     "file": "cuda-graphs",
     "refs": [],
     "title": "Full per-kernel timings on cuda_graphs_disable",
+    "type": "scenario"
+  },
+  "rq-8840662f": {
+    "decl": "Scenario: Per-fragment exclusion scale yields per-fragment net contribution",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Per-fragment exclusion scale yields per-fragment net contribution",
     "type": "scenario"
   },
   "rq-884b5cd6": {
@@ -14665,6 +14915,13 @@
       }
     ],
     "title": "AnalyzeSummary",
+    "type": "api-item"
+  },
+  "rq-89245537": {
+    "decl": "- `scatter_positions_to_tile_order(posq, sorted_particle_ids,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "scatter_positions_to_tile_order",
     "type": "api-item"
   },
   "rq-892e8856": {
@@ -14987,6 +15244,13 @@
     "title": "Gherkin Scenarios",
     "type": "section"
   },
+  "rq-8c630ad6": {
+    "decl": "Scenario: Charge-zero atoms issue no atomicAdd<i64> against rho_fixed",
+    "file": "forces/spme",
+    "refs": [],
+    "title": "Charge-zero atoms issue no atomicAdd<i64> against rho_fixed",
+    "type": "scenario"
+  },
   "rq-8c786f79": {
     "decl": "Scenario: Exclusion only applies to the listed pair",
     "file": "forces/lj-pair-force",
@@ -15048,6 +15312,13 @@
     "title": "reduce_angle_forces on zero particles is a no-op",
     "type": "scenario"
   },
+  "rq-8d86bfa6": {
+    "decl": "Scenario: Single-pair pass accumulates Newton's-3rd pair forces",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Single-pair pass accumulates Newton's-3rd pair forces",
+    "type": "scenario"
+  },
   "rq-8d904561": {
     "decl": "## Out of Scope",
     "file": "integration/framework",
@@ -15055,6 +15326,21 @@
     "refs": [],
     "title": "Out of Scope",
     "type": "section"
+  },
+  "rq-8db4fbff": {
+    "decl": "### Launch Configuration",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Launch Configuration",
+    "type": "section"
+  },
+  "rq-8de805b0": {
+    "decl": "- `__device__ static inline long long heddle_jit_real_to_fixed(Real f)",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "__device__",
+    "type": "api-item"
   },
   "rq-8df7fb0c": {
     "decl": "- `InitState` — the parser's output. Fields:",
@@ -15084,12 +15370,7 @@
     "decl": "## Test Fixture",
     "file": "pipeline-reproducibility",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Test Fixture",
     "type": "section"
   },
@@ -15124,14 +15405,6 @@
     "refs": [],
     "title": "Influence recompute under NVT fires once",
     "type": "scenario"
-  },
-  "rq-8e8eef43": {
-    "decl": "### Launchers",
-    "file": "forces/pair-force-kernel",
-    "level": 3,
-    "refs": [],
-    "title": "Launchers",
-    "type": "section"
   },
   "rq-8ea6cf9c": {
     "decl": "Scenario: Pair appearing in both [bonds] and [constraints] is rejected",
@@ -15346,12 +15619,7 @@
   "rq-90524f5d": {
     "decl": "Scenario: Sub-skin movement does not trigger a rebuild",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Sub-skin movement does not trigger a rebuild",
     "type": "scenario"
   },
@@ -15623,6 +15891,13 @@
     "title": "step_class(Slow) does not launch the bonded or angle composed kernels",
     "type": "scenario"
   },
+  "rq-92b63da0": {
+    "decl": "Scenario: f64 build refuses to instantiate the packed-neighbour kernel",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "f64 build refuses to instantiate the packed-neighbour kernel",
+    "type": "scenario"
+  },
   "rq-92cecd28": {
     "decl": "Scenario: apply launches the expected kernel set",
     "file": "integration/berendsen-barostat",
@@ -15718,6 +15993,14 @@
     ],
     "title": "IntegratorBuilder",
     "type": "api-item"
+  },
+  "rq-9333127d": {
+    "decl": "## Gherkin Scenarios",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Gherkin Scenarios",
+    "type": "section"
   },
   "rq-93367a8f": {
     "decl": "## Dependencies",
@@ -15849,6 +16132,14 @@
     "title": "potential_energies and virials round-trip through ParticleBuffers",
     "type": "scenario"
   },
+  "rq-9527bd2d": {
+    "decl": "## Configuration",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Configuration",
+    "type": "section"
+  },
   "rq-95385a9d": {
     "decl": "### Influence-function multiply, virial partial reduction, and inverse FFT",
     "file": "forces/spme",
@@ -15922,6 +16213,13 @@
     "file": "forces/framework",
     "refs": [],
     "title": "step_class(Fast, ForcesAndScalars) does not touch slow_total_* accumulators",
+    "type": "scenario"
+  },
+  "rq-95f0812c": {
+    "decl": "Scenario: Single-pair pass dispatches to the no-exclusion evaluator",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Single-pair pass dispatches to the no-exclusion evaluator",
     "type": "scenario"
   },
   "rq-963604a4": {
@@ -16059,13 +16357,6 @@
     "refs": [],
     "title": "Types",
     "type": "section"
-  },
-  "rq-97db6cec": {
-    "decl": "Scenario: Sweep loop accumulates correctly when count is one more than WARP_SIZE",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Sweep loop accumulates correctly when count is one more than WARP_SIZE",
-    "type": "scenario"
   },
   "rq-97e525d8": {
     "decl": "Scenario: trajectory_every = 0 is accepted (disables trajectory output)",
@@ -16502,13 +16793,6 @@
     "title": "Open fails when the parent directory does not exist",
     "type": "scenario"
   },
-  "rq-9bb18c44": {
-    "decl": "Scenario: _f and _fev variants agree on the force output for the same inputs",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "_f and _fev variants agree on the force output for the same inputs",
-    "type": "scenario"
-  },
   "rq-9bb3094c": {
     "decl": "Scenario: Triatomic at equilibrium gives zero net force on all atoms",
     "file": "forces/harmonic-angle",
@@ -16619,6 +16903,13 @@
     "title": "Integrator kick runs before thermostat rescale (canonical order)",
     "type": "scenario"
   },
+  "rq-9c80a966": {
+    "decl": "- `finalize_fast_class_forces(fast_force_*_fp, fast_energy_fp,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "finalize_fast_class_forces",
+    "type": "api-item"
+  },
   "rq-9c883334": {
     "decl": "Scenario: LogWriter in SI mode multiplies temperature by the temperature factor",
     "file": "io/log-output",
@@ -16675,6 +16966,14 @@
     ],
     "title": "vv_kick does not modify image flags",
     "type": "scenario"
+  },
+  "rq-9cd4085e": {
+    "decl": "### JIT fragment behaviour <!-- rq-lj-jit-frag -->",
+    "file": "forces/lj-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "JIT fragment behaviour <!-- rq-lj-jit-frag -->",
+    "type": "section"
   },
   "rq-9ce1bd52": {
     "decl": "Scenario: validate_against accepts a well-formed config",
@@ -16859,6 +17158,13 @@
       }
     ],
     "title": "Bond row with wrong column count",
+    "type": "scenario"
+  },
+  "rq-9e08c8b0": {
+    "decl": "Scenario: Single-pair and exclusion-correction passes unaffected by SPC",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Single-pair and exclusion-correction passes unaffected by SPC",
     "type": "scenario"
   },
   "rq-9e09673b": {
@@ -17073,12 +17379,7 @@
   "rq-9f63a183": {
     "decl": "Scenario: Over-skin movement triggers a rebuild",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Over-skin movement triggers a rebuild",
     "type": "scenario"
   },
@@ -17101,6 +17402,13 @@
     "refs": [],
     "title": "Algorithm",
     "type": "section"
+  },
+  "rq-9f947525": {
+    "decl": "- `compute_block_bbox(tile_sorted_posq, tile_atom_count,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "compute_block_bbox",
+    "type": "api-item"
   },
   "rq-9f95c5da": {
     "decl": "## Algorithm",
@@ -17222,7 +17530,12 @@
     "decl": "### Source Fragment",
     "file": "integration/andersen",
     "level": 3,
-    "refs": [],
+    "refs": [
+      {
+        "file": "src/integrator/andersen.rs",
+        "kind": "code"
+      }
+    ],
     "title": "Source Fragment",
     "type": "section"
   },
@@ -17456,6 +17769,21 @@
     "title": "Timings file path can be overridden in [output]",
     "type": "scenario"
   },
+  "rq-a2f419db": {
+    "decl": "## Fixed-Point Force Buffers",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Fixed-Point Force Buffers",
+    "type": "section"
+  },
+  "rq-a304e8cb": {
+    "decl": "Scenario: A pair past the maximum slot cutoff contributes zero by bit-exact equality",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "A pair past the maximum slot cutoff contributes zero by bit-exact equality",
+    "type": "scenario"
+  },
   "rq-a30ac09f": {
     "decl": "Scenario: Reject empty type name",
     "file": "io/config-schema",
@@ -17603,6 +17931,14 @@
     ],
     "title": "IntegratorStepExt::step never installs constraint hooks",
     "type": "scenario"
+  },
+  "rq-a4b9e702": {
+    "decl": "### Packed-Neighbour Pass",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Packed-Neighbour Pass",
+    "type": "section"
   },
   "rq-a4d5e711": {
     "decl": "- `SimulationBox::wrap_position_with_image_count(&self, position: [f32; 3]) -> ([f32; 3], [i32; 3])`",
@@ -17765,6 +18101,13 @@
     "title": "Construct CsvrThermostat via the registry (unconstrained system)",
     "type": "scenario"
   },
+  "rq-a6ecc598": {
+    "decl": "Scenario: Packed-neighbour pass skips the no-atom sentinel",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Packed-neighbour pass skips the no-atom sentinel",
+    "type": "scenario"
+  },
   "rq-a704e8b4": {
     "decl": "Scenario: step() with one fast-class pair-force slot launches the composed kernel once",
     "file": "forces/jit-composed-pair-force",
@@ -17836,22 +18179,17 @@
     "title": "Out of Scope",
     "type": "section"
   },
-  "rq-a783727a": {
-    "decl": "- `lj_pair_force_f`, `lj_pair_force_fev` — see `lj-pair-force.md`.",
-    "file": "forces/pair-force-kernel",
+  "rq-a786df3a": {
+    "decl": "Scenario: Packed-neighbour pass runs one block per i-block",
+    "file": "forces/packed-neighbour-pair-force",
     "refs": [],
-    "title": "lj_pair_force_f",
-    "type": "api-item"
+    "title": "Packed-neighbour pass runs one block per i-block",
+    "type": "scenario"
   },
   "rq-a7aac794": {
     "decl": "Scenario: Cell counts reflect perpendicular widths for a tilted box",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Cell counts reflect perpendicular widths for a tilted box",
     "type": "scenario"
   },
@@ -18055,12 +18393,7 @@
   "rq-a99ca751": {
     "decl": "Scenario: Cell index of a position outside the primary cell wraps before binning",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Cell index of a position outside the primary cell wraps before binning",
     "type": "scenario"
   },
@@ -18277,13 +18610,6 @@
     "file": "forces/spme",
     "refs": [],
     "title": "Reject grid dimension below 2*spline_order along b",
-    "type": "scenario"
-  },
-  "rq-ab8046b4": {
-    "decl": "Scenario: Self-pair (i == j) in a trivial-mode neighbour list contributes zero",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Self-pair (i == j) in a trivial-mode neighbour list contributes zero",
     "type": "scenario"
   },
   "rq-ab8c77bc": {
@@ -18537,6 +18863,13 @@
     "title": "Berendsen barostat composes with velocity-Verlet integrator (NPH)",
     "type": "scenario"
   },
+  "rq-ad6f0de0": {
+    "decl": "- `crate::gpu::sort_blocks_by_volume(kernels, block_bbox,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "crate",
+    "type": "api-item"
+  },
   "rq-ad7eb40f": {
     "decl": "### Types",
     "file": "forces/neighbor-list",
@@ -18588,13 +18921,6 @@
     "refs": [],
     "title": "`[neighbor_list]` (optional table)",
     "type": "section"
-  },
-  "rq-ae1b567a": {
-    "decl": "Scenario: Particle count below WARPS_PER_BLOCK uses a single under-full block",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Particle count below WARPS_PER_BLOCK uses a single under-full block",
-    "type": "scenario"
   },
   "rq-ae20ddac": {
     "decl": "Scenario: Force is C¹ continuous at r_switch",
@@ -18898,6 +19224,13 @@
     "title": "ParticleBuffers",
     "type": "api-item"
   },
+  "rq-b099ff28": {
+    "decl": "Scenario: Composer emits a no-exclusion evaluator and a correction evaluator",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Composer emits a no-exclusion evaluator and a correction evaluator",
+    "type": "scenario"
+  },
   "rq-b0b4c220": {
     "decl": "Scenario: rescale_isotropic rejects zero factor",
     "file": "integration/berendsen-barostat",
@@ -18920,6 +19253,13 @@
       }
     ],
     "title": "Empty topology file is valid",
+    "type": "scenario"
+  },
+  "rq-b1060817": {
+    "decl": "Scenario: MAX_BITS_FOR_PAIRS equals 3",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "MAX_BITS_FOR_PAIRS equals 3",
     "type": "scenario"
   },
   "rq-b10ed5ec": {
@@ -18998,6 +19338,13 @@
     "title": "Newton's third law holds for the framework's combined force",
     "type": "scenario"
   },
+  "rq-b19d4365": {
+    "decl": "Scenario: A Uniform-cutoff fragment whose c² equals HEDDLE_JIT_MAX_CUTOFF_SQUARED has its per-fragment guard omitted",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "A Uniform-cutoff fragment whose c² equals HEDDLE_JIT_MAX_CUTOFF_SQUARED has its per-fragment guard omitted",
+    "type": "scenario"
+  },
   "rq-b1a132b5": {
     "decl": "Scenario: ForceField::new iterates the registry in registration order",
     "file": "forces/framework",
@@ -19061,12 +19408,7 @@
   "rq-b2314952": {
     "decl": "Scenario: Bit-exact equality after a single full velocity-Verlet step",
     "file": "pipeline-reproducibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Bit-exact equality after a single full velocity-Verlet step",
     "type": "scenario"
   },
@@ -19076,6 +19418,21 @@
     "level": 3,
     "refs": [],
     "title": "Reduction Kernel",
+    "type": "section"
+  },
+  "rq-b2894e9e": {
+    "decl": "Scenario: Saturation triggers an error if force exceeds the fixed-point range",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Saturation triggers an error if force exceeds the fixed-point range",
+    "type": "scenario"
+  },
+  "rq-b28a6d96": {
+    "decl": "### Single-Pair Pass",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Single-Pair Pass",
     "type": "section"
   },
   "rq-b296ab12": {
@@ -19219,13 +19576,15 @@
   "rq-b39d3be7": {
     "decl": "Scenario: Displacement check uses minimum-image displacement",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Displacement check uses minimum-image displacement",
+    "type": "scenario"
+  },
+  "rq-b3b12764": {
+    "decl": "Scenario: A PerPair-cutoff fragment has its runtime cutoff_squared guard emitted",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "A PerPair-cutoff fragment has its runtime cutoff_squared guard emitted",
     "type": "scenario"
   },
   "rq-b3b19b01": {
@@ -19292,6 +19651,13 @@
     "file": "integration/jit-composed-post-force",
     "refs": [],
     "title": "FragmentCompileFailed surfaces every active fragment's label",
+    "type": "scenario"
+  },
+  "rq-b49bfdff": {
+    "decl": "Scenario: Packed-neighbour pass treats every pair as scale 1.0",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Packed-neighbour pass treats every pair as scale 1.0",
     "type": "scenario"
   },
   "rq-b4bb7096": {
@@ -19364,12 +19730,7 @@
   "rq-b5289acc": {
     "decl": "Scenario: Neighbour list is not globally partner-ID sorted across cells",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Neighbour list is not globally partner-ID sorted across cells",
     "type": "scenario"
   },
@@ -19392,6 +19753,13 @@
     "refs": [],
     "title": "Skin-distance contract under batched replay",
     "type": "section"
+  },
+  "rq-b5c18e6b": {
+    "decl": "- `NeighborListState` adds the fields documented under *Atom",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "NeighborListState",
+    "type": "api-item"
   },
   "rq-b5c52011": {
     "decl": "- `pair_force_fragment(&self, cx: &PotentialBuildContext<'_>) ->",
@@ -19465,13 +19833,6 @@
     "file": "forces/lj-pair-force",
     "refs": [],
     "title": "Two-particle pair energy matches the closed-form Lennard-Jones expression",
-    "type": "scenario"
-  },
-  "rq-b6c1c681": {
-    "decl": "Scenario: _f variant does not write the energy or virial slot output rows",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "_f variant does not write the energy or virial slot output rows",
     "type": "scenario"
   },
   "rq-b6c8867f": {
@@ -19555,14 +19916,6 @@
     "title": "Project Structure",
     "type": "section"
   },
-  "rq-b73c3b0b": {
-    "decl": "## Kernel Topology",
-    "file": "forces/pair-force-kernel",
-    "level": 2,
-    "refs": [],
-    "title": "Kernel Topology",
-    "type": "section"
-  },
   "rq-b746e796": {
     "decl": "Scenario: Config does not exist",
     "file": "simulation-runner",
@@ -19641,6 +19994,13 @@
     "title": "[thermostat] kind = \"berendsen\" is accepted",
     "type": "scenario"
   },
+  "rq-b7ed60ff": {
+    "decl": "Scenario: SPME-real always reports CutoffHandling::Uniform",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "SPME-real always reports CutoffHandling::Uniform",
+    "type": "scenario"
+  },
   "rq-b8070abb": {
     "decl": "### Constructor",
     "file": "simulation-box",
@@ -19693,12 +20053,7 @@
   "rq-b87fd5e8": {
     "decl": "Scenario: Positions visibly evolve over the 100-step lossless forward run",
     "file": "pipeline-reversibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Positions visibly evolve over the 100-step lossless forward run",
     "type": "scenario"
   },
@@ -19927,12 +20282,7 @@
   "rq-bb3773aa": {
     "decl": "Scenario: Trivial-mode pre_step does no work",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Trivial-mode pre_step does no work",
     "type": "scenario"
   },
@@ -20065,6 +20415,13 @@
     "title": "Reject an unknown field under [minimization.algorithm]",
     "type": "scenario"
   },
+  "rq-bce26a14": {
+    "decl": "# Feature: Packed-Neighbour Pair-Force Architecture",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Feature: Packed-Neighbour Pair-Force Architecture",
+    "type": "file"
+  },
   "rq-bcf7e0eb": {
     "decl": "- `lint_analyses(config_path: &Path) -> LintReport`",
     "file": "analysis/framework",
@@ -20076,13 +20433,6 @@
     ],
     "title": "lint_analyses",
     "type": "api-item"
-  },
-  "rq-bd067911": {
-    "decl": "Scenario: Per-particle forces sum to zero for an isolated system",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Per-particle forces sum to zero for an isolated system",
-    "type": "scenario"
   },
   "rq-bd149f52": {
     "decl": "Scenario: Acceleration scales inversely with mass",
@@ -20110,6 +20460,14 @@
     "refs": [],
     "title": "Near-collinear geometry (sin θ ≈ 0) produces zero force",
     "type": "scenario"
+  },
+  "rq-bd3f4707": {
+    "decl": "## Block Bounding Boxes",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Block Bounding Boxes",
+    "type": "section"
   },
   "rq-bda9c0a2": {
     "decl": "Scenario: [barostat] missing kind is rejected",
@@ -20463,12 +20821,7 @@
   "rq-c0cfc5d6": {
     "decl": "Scenario: Cell counts are floor(w / (r_cut + r_skin)) for an orthorhombic box",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Cell counts are floor(w / (r_cut + r_skin)) for an orthorhombic box",
     "type": "scenario"
   },
@@ -20492,6 +20845,13 @@
     "title": "Class-Combine Kernel",
     "type": "section"
   },
+  "rq-c123c82c": {
+    "decl": "Scenario: excluded_pair_atoms preserves canonical ExclusionList order",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "excluded_pair_atoms preserves canonical ExclusionList order",
+    "type": "scenario"
+  },
   "rq-c1308495": {
     "decl": "## Lattice Convention",
     "file": "simulation-box",
@@ -20499,6 +20859,13 @@
     "refs": [],
     "title": "Lattice Convention",
     "type": "section"
+  },
+  "rq-c156295f": {
+    "decl": "Scenario: Three-pass composition is run-to-run byte-identical",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Three-pass composition is run-to-run byte-identical",
+    "type": "scenario"
   },
   "rq-c15b187c": {
     "decl": "## Test Targets",
@@ -20565,6 +20932,13 @@
     "refs": [],
     "title": "Two runs of the LJ + SPME composed-kernel configuration agree byte-for-byte",
     "type": "scenario"
+  },
+  "rq-c1afd2f3": {
+    "decl": "- `sort_block_data(sorted_blocks, block_centre, block_bbox,",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "sort_block_data",
+    "type": "api-item"
   },
   "rq-c1c9fe3a": {
     "decl": "Scenario: Langevin run includes Langevin rows and excludes velocity-Verlet rows",
@@ -20713,12 +21087,7 @@
     "decl": "## Gherkin Scenarios",
     "file": "forces/neighbor-list",
     "level": 2,
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Gherkin Scenarios",
     "type": "section"
   },
@@ -20729,6 +21098,13 @@
     "refs": [],
     "title": "PTX Module Loading",
     "type": "section"
+  },
+  "rq-c469b2e8": {
+    "decl": "Scenario: NPT box transition flips SPC eligibility without graph re-capture",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "NPT box transition flips SPC eligibility without graph re-capture",
+    "type": "scenario"
   },
   "rq-c4845f90": {
     "decl": "- `Timings::finalize(&mut self) -> Result<TimingsReport, TimingsError>`",
@@ -20924,6 +21300,13 @@
     "title": "Write a single frame with velocities and without images",
     "type": "scenario"
   },
+  "rq-c5e23ba8": {
+    "decl": "Scenario: Block count derives from ceil(N / 32)",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Block count derives from ceil(N / 32)",
+    "type": "scenario"
+  },
   "rq-c5f04195": {
     "decl": "Scenario: Two independent runs with identical configs are byte-identical",
     "file": "integration/mtk-npt",
@@ -21073,6 +21456,13 @@
     "title": "Slot Behaviour Contract",
     "type": "section"
   },
+  "rq-c74e6546": {
+    "decl": "Scenario: No per-potential standalone kernel is loaded",
+    "file": "forces/pair-force-kernel",
+    "refs": [],
+    "title": "No per-potential standalone kernel is loaded",
+    "type": "scenario"
+  },
   "rq-c79a1408": {
     "decl": "Scenario: bond_type missing potential field",
     "file": "io/config-schema",
@@ -21147,6 +21537,14 @@
     ],
     "title": "draw_counter starts at 0 and increments by 1 per apply_post",
     "type": "scenario"
+  },
+  "rq-c85fa8d1": {
+    "decl": "### Functions",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Functions",
+    "type": "section"
   },
   "rq-c8848b7f": {
     "decl": "### Functions and methods",
@@ -21656,12 +22054,7 @@
   "rq-cd50d861": {
     "decl": "Scenario: cell_offsets contains the prefix sum of cell occupancies",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cell_offsets contains the prefix sum of cell occupancies",
     "type": "scenario"
   },
@@ -21911,12 +22304,7 @@
   "rq-cf847c1f": {
     "decl": "Scenario: Box generation tick that changes n_cells_total forces a rebuild",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Box generation tick that changes n_cells_total forces a rebuild",
     "type": "scenario"
   },
@@ -22018,12 +22406,7 @@
   "rq-d0a54b3c": {
     "decl": "Scenario: Positions visibly evolve over the 100-step run",
     "file": "pipeline-reproducibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reproducibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Positions visibly evolve over the 100-step run",
     "type": "scenario"
   },
@@ -22169,14 +22552,16 @@
   "rq-d22f105f": {
     "decl": "Scenario: cell_offsets is reallocated when n_cells_total changes",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cell_offsets is reallocated when n_cells_total changes",
     "type": "scenario"
+  },
+  "rq-d244267b": {
+    "decl": "- `__device__ static inline Real heddle_jit_fixed_to_real(unsigned long long s)",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "__device__",
+    "type": "api-item"
   },
   "rq-d25000c5": {
     "decl": "Scenario: vv_kick_drift produces the exact half-step kinematics under a constant force",
@@ -22777,18 +23162,11 @@
     "type": "api-item"
   },
   "rq-d7a35317": {
-    "decl": "# Feature: Fused Pair-Force Kernel Pattern",
+    "decl": "# Feature: Pair-Force Kernel Conventions",
     "file": "forces/pair-force-kernel",
     "refs": [],
-    "title": "Feature: Fused Pair-Force Kernel Pattern",
+    "title": "Feature: Pair-Force Kernel Conventions",
     "type": "file"
-  },
-  "rq-d7cf2ae0": {
-    "decl": "Scenario: Sweep handles the iteration boundary exactly at WARP_SIZE",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Sweep handles the iteration boundary exactly at WARP_SIZE",
-    "type": "scenario"
   },
   "rq-d801f67c": {
     "decl": "Scenario: compute_total_virial is deterministic",
@@ -22912,6 +23290,13 @@
     "refs": [],
     "title": "Composed-Module Structure",
     "type": "section"
+  },
+  "rq-d9197bb9": {
+    "decl": "Scenario: tile_sorted_positions reflects current positions after the scatter",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "tile_sorted_positions reflects current positions after the scatter",
+    "type": "scenario"
   },
   "rq-d920e446": {
     "decl": "Scenario: fill kernel does not write beyond the buffer",
@@ -23040,15 +23425,17 @@
     "title": "Per-Step Interface",
     "type": "section"
   },
+  "rq-dabd2130": {
+    "decl": "Scenario: positions round-trip through ParticleBuffers via posq.xyz",
+    "file": "particle-state",
+    "refs": [],
+    "title": "positions round-trip through ParticleBuffers via posq.xyz",
+    "type": "scenario"
+  },
   "rq-dacb071c": {
     "decl": "Scenario: Generation mismatch with new box too small returns BoxTooSmallForCells",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Generation mismatch with new box too small returns BoxTooSmallForCells",
     "type": "scenario"
   },
@@ -23172,14 +23559,17 @@
   "rq-db8b171d": {
     "decl": "Scenario: pre_step with unchanged box does not refresh the cell-layout cache",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "pre_step with unchanged box does not refresh the cell-layout cache",
     "type": "scenario"
+  },
+  "rq-db98d977": {
+    "decl": "## Determinism",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Determinism",
+    "type": "section"
   },
   "rq-dba8d096": {
     "decl": "Scenario: Lint with --with-gpu reports successful GPU setup",
@@ -23225,6 +23615,22 @@
     "refs": [],
     "title": "Construct HarmonicAngleState",
     "type": "scenario"
+  },
+  "rq-dbf9c9cf": {
+    "decl": "### Correction-Pass Design",
+    "file": "forces/jit-composed-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Correction-Pass Design",
+    "type": "section"
+  },
+  "rq-dbffee81": {
+    "decl": "## Construction Pipeline",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Construction Pipeline",
+    "type": "section"
   },
   "rq-dc140510": {
     "decl": "- `MinlogWriter` — handle to an open `.minlog` file. Fields are",
@@ -23370,13 +23776,6 @@
     "file": "integration/jit-composed-post-force",
     "refs": [],
     "title": "Construction is rejected when a built-in slot exposes no fragment",
-    "type": "scenario"
-  },
-  "rq-dce96f48": {
-    "decl": "Scenario: Sweep loop runs zero iterations when count == 0",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Sweep loop runs zero iterations when count == 0",
     "type": "scenario"
   },
   "rq-dcfdb7c9": {
@@ -23643,13 +24042,6 @@
     "title": "step() on a ForceField with both slots sums LJ and Morse",
     "type": "scenario"
   },
-  "rq-df61d939": {
-    "decl": "Scenario: Kernel does not modify neighbor_counts or neighbor_list",
-    "file": "forces/pair-force-kernel",
-    "refs": [],
-    "title": "Kernel does not modify neighbor_counts or neighbor_list",
-    "type": "scenario"
-  },
   "rq-df6d79a1": {
     "decl": "## Force Classes",
     "file": "forces/framework",
@@ -23670,6 +24062,13 @@
     ],
     "title": "Force Classes",
     "type": "section"
+  },
+  "rq-df787c57": {
+    "decl": "Scenario: SPC fast path wraps pi and pj against the i-block centre",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "SPC fast path wraps pi and pj against the i-block centre",
+    "type": "scenario"
   },
   "rq-df8766ae": {
     "decl": "### Force gather",
@@ -23808,20 +24207,20 @@
     "title": "Slot bind methods are invoked once each in canonical order",
     "type": "scenario"
   },
-  "rq-e1345339": {
-    "decl": "## Feature API",
-    "file": "forces/pair-force-kernel",
-    "level": 2,
-    "refs": [],
-    "title": "Feature API",
-    "type": "section"
-  },
   "rq-e15cc5ac": {
     "decl": "## Algorithm",
     "file": "integration/andersen",
     "level": 2,
     "refs": [],
     "title": "Algorithm",
+    "type": "section"
+  },
+  "rq-e1643cc5": {
+    "decl": "## Feature API",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Feature API",
     "type": "section"
   },
   "rq-e16e72bd": {
@@ -23831,6 +24230,13 @@
     "refs": [],
     "title": "Sample bookkeeping",
     "type": "section"
+  },
+  "rq-e1717060": {
+    "decl": "Scenario: Min-image branch is taken when the predicate is false",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Min-image branch is taken when the predicate is false",
+    "type": "scenario"
   },
   "rq-e17a3af9": {
     "decl": "### `Barostat` trait overrides",
@@ -23948,12 +24354,7 @@
   "rq-e2a31585": {
     "decl": "Scenario: Box-generation refresh handles tilt mutation",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Box-generation refresh handles tilt mutation",
     "type": "scenario"
   },
@@ -24093,6 +24494,13 @@
     "title": "Harmonic angle_type rejects theta_0 outside [0, π]",
     "type": "scenario"
   },
+  "rq-e39a87c1": {
+    "decl": "Scenario: SPC fast path inner loop skips triclinic_min_image",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "SPC fast path inner loop skips triclinic_min_image",
+    "type": "scenario"
+  },
   "rq-e39d0ed8": {
     "decl": "Scenario: max_cutoff aggregation determines the neighbor-list radius",
     "file": "forces/framework",
@@ -24191,6 +24599,13 @@
     "title": "Unknown bond type name rejected",
     "type": "scenario"
   },
+  "rq-e4628324": {
+    "decl": "Scenario: LJ JIT fragment emits the switching code when at least one pair-type has r_switch < cutoff",
+    "file": "forces/lj-pair-force",
+    "refs": [],
+    "title": "LJ JIT fragment emits the switching code when at least one pair-type has r_switch < cutoff",
+    "type": "scenario"
+  },
   "rq-e469657f": {
     "decl": "Scenario: A composite-fragment builder displaces its constituents' fragments",
     "file": "forces/jit-composed-pair-force",
@@ -24225,6 +24640,13 @@
     "refs": [],
     "title": "Out of Scope",
     "type": "section"
+  },
+  "rq-e4bd99f7": {
+    "decl": "Scenario: SPME-real JIT fragment reports CutoffHandling::Uniform(r_cut_real)",
+    "file": "forces/spme",
+    "refs": [],
+    "title": "SPME-real JIT fragment reports CutoffHandling::Uniform(r_cut_real)",
+    "type": "scenario"
   },
   "rq-e4c2141e": {
     "decl": "Scenario: Kinetic energy reduction produces a Real in both builds",
@@ -24417,12 +24839,7 @@
   "rq-e643b070": {
     "decl": "Scenario: neighbor_list cell-list mode omitting max_neighbors uses default 256",
     "file": "io/config-schema",
-    "refs": [
-      {
-        "file": "tests/io_config.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "neighbor_list cell-list mode omitting max_neighbors uses default 256",
     "type": "scenario"
   },
@@ -24447,6 +24864,13 @@
     "title": "Functions",
     "type": "section"
   },
+  "rq-e6b37d18": {
+    "decl": "- `ForceField` adds the fixed-point class accumulator fields",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "ForceField",
+    "type": "api-item"
+  },
   "rq-e6b6f2d8": {
     "decl": "Scenario: vv_kick_drift wraps positions back into the primary image",
     "file": "integration/velocity-verlet",
@@ -24457,6 +24881,13 @@
       }
     ],
     "title": "vv_kick_drift wraps positions back into the primary image",
+    "type": "scenario"
+  },
+  "rq-e6de7839": {
+    "decl": "Scenario: Equal-volume blocks tie-break on block index",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Equal-volume blocks tie-break on block index",
     "type": "scenario"
   },
   "rq-e6e7d6e2": {
@@ -24486,12 +24917,7 @@
   "rq-e75b24e7": {
     "decl": "Scenario: Neighbor list excludes the self atom",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Neighbor list excludes the self atom",
     "type": "scenario"
   },
@@ -24505,6 +24931,13 @@
       }
     ],
     "title": "Load a topology file containing an angle",
+    "type": "scenario"
+  },
+  "rq-e7839cee": {
+    "decl": "Scenario: single_pair_atoms overflow grows the buffer and re-runs construction",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "single_pair_atoms overflow grows the buffer and re-runs construction",
     "type": "scenario"
   },
   "rq-e794b794": {
@@ -24580,12 +25013,7 @@
   "rq-e84d3bac": {
     "decl": "Scenario: Reject a tilted box whose perpendicular width drops below 3*(r_cut+r_skin)",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Reject a tilted box whose perpendicular width drops below 3*(r_cut+r_skin)",
     "type": "scenario"
   },
@@ -24629,6 +25057,20 @@
     "title": "Newton's third law",
     "type": "section"
   },
+  "rq-e8667000": {
+    "decl": "Scenario: Sparse (i-block, j-block) candidate routes its pairs to single_pair_atoms",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Sparse (i-block, j-block) candidate routes its pairs to single_pair_atoms",
+    "type": "scenario"
+  },
+  "rq-e8699851": {
+    "decl": "Scenario: A Uniform-cutoff fragment whose c² is strictly less than HEDDLE_JIT_MAX_CUTOFF_SQUARED gets a compile-time-constant guard",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "A Uniform-cutoff fragment whose c² is strictly less than HEDDLE_JIT_MAX_CUTOFF_SQUARED gets a compile-time-constant guard",
+    "type": "scenario"
+  },
   "rq-e8adaa9c": {
     "decl": "Scenario: lookup returns None for an unregistered kind",
     "file": "integration/framework",
@@ -24640,6 +25082,14 @@
     ],
     "title": "lookup returns None for an unregistered kind",
     "type": "scenario"
+  },
+  "rq-e8ba1aff": {
+    "decl": "### Packed-Neighbour Entry-Point Arguments",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Packed-Neighbour Entry-Point Arguments",
+    "type": "section"
   },
   "rq-e8be1a1c": {
     "decl": "- `SimulationBox::lattice(&self) -> [f32; 6]`",
@@ -24827,15 +25277,17 @@
     "title": "Reject extra fields (e.g. Berendsen barostat doesn't have a seed)",
     "type": "scenario"
   },
+  "rq-e9ed7617": {
+    "decl": "- `compute_sort_keys(block_bbox, sorted_blocks, n_blocks)` — one",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "compute_sort_keys",
+    "type": "api-item"
+  },
   "rq-ea0ee5ef": {
     "decl": "Scenario: Neighbor list contains every particle within r_cut + r_skin",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Neighbor list contains every particle within r_cut + r_skin",
     "type": "scenario"
   },
@@ -24881,6 +25333,13 @@
     ],
     "title": "Explicit 1-3 exclusion overrides the angle's implicit default",
     "type": "scenario"
+  },
+  "rq-eaaddf05": {
+    "decl": "- `Real4` — packed 4-tuple of `Real` values used for `posq`. <!-- rq-real4-type -->",
+    "file": "particle-state",
+    "refs": [],
+    "title": "Real4",
+    "type": "api-item"
   },
   "rq-eadadcb4": {
     "decl": "# Column format: atom_1 atom_2 ... atom_k  constraint_type_name",
@@ -25044,12 +25503,7 @@
   "rq-ecad9802": {
     "decl": "Scenario: write_cursors is reset to zero before each rebuild",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "write_cursors is reset to zero before each rebuild",
     "type": "scenario"
   },
@@ -25064,6 +25518,13 @@
     ],
     "title": "slot_kind_field_dims",
     "type": "api-item"
+  },
+  "rq-ecc1241f": {
+    "decl": "Scenario: inv_r, r, qi, qj are computed once per pair and threaded into every fragment's evaluate",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "inv_r, r, qi, qj are computed once per pair and threaded into every fragment's evaluate",
+    "type": "scenario"
   },
   "rq-ecc664ff": {
     "decl": "### Example",
@@ -25096,12 +25557,7 @@
   "rq-ed048159": {
     "decl": "Scenario: All observables are finite after the 100-step lossless forward run",
     "file": "pipeline-reversibility",
-    "refs": [
-      {
-        "file": "tests/pipeline_reversibility.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "All observables are finite after the 100-step lossless forward run",
     "type": "scenario"
   },
@@ -25179,6 +25635,13 @@
     "title": "SimulationBox",
     "type": "api-item"
   },
+  "rq-ede1fc4c": {
+    "decl": "Scenario: Partial-block inactive lanes carry +infinity",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Partial-block inactive lanes carry +infinity",
+    "type": "scenario"
+  },
   "rq-ede87154": {
     "decl": "Scenario: spme_recip_reduce_partials writes (0.5 / N) · Σ virial_partials on device",
     "file": "forces/spme",
@@ -25212,6 +25675,14 @@
     "level": 4,
     "refs": [],
     "title": "`[phase.thermostat]` (optional)",
+    "type": "section"
+  },
+  "rq-ee43a3fe": {
+    "decl": "## Out of Scope",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "Out of Scope",
     "type": "section"
   },
   "rq-ee43e3d6": {
@@ -25547,10 +26018,10 @@
     "type": "scenario"
   },
   "rq-f04e473c": {
-    "decl": "# Feature: SoA Particle State and GPU Buffers",
+    "decl": "# Feature: Particle State and GPU Buffers",
     "file": "particle-state",
     "refs": [],
-    "title": "Feature: SoA Particle State and GPU Buffers",
+    "title": "Feature: Particle State and GPU Buffers",
     "type": "file"
   },
   "rq-f062ec85": {
@@ -25588,14 +26059,6 @@
     ],
     "title": "Reject duplicate analysis names",
     "type": "scenario"
-  },
-  "rq-f0753132": {
-    "decl": "### PTX Module Loading",
-    "file": "forces/pair-force-kernel",
-    "level": 3,
-    "refs": [],
-    "title": "PTX Module Loading",
-    "type": "section"
   },
   "rq-f08d7a33": {
     "decl": "## Per-Step Interface",
@@ -25684,6 +26147,14 @@
     "title": "Accept a two-type config with a complete pair_interactions table",
     "type": "scenario"
   },
+  "rq-f119bc11": {
+    "decl": "### Single-Pair Entry-Point Arguments",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 3,
+    "refs": [],
+    "title": "Single-Pair Entry-Point Arguments",
+    "type": "section"
+  },
   "rq-f11e9d4c": {
     "decl": "Scenario: Reject duplicate pair interaction",
     "file": "io/config-schema",
@@ -25707,12 +26178,7 @@
   "rq-f164bf76": {
     "decl": "Scenario: cell_indices is populated by the device pipeline",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cell_indices is populated by the device pipeline",
     "type": "scenario"
   },
@@ -25738,6 +26204,13 @@
       }
     ],
     "title": "Header line has the documented column names in the documented order",
+    "type": "scenario"
+  },
+  "rq-f1a44df1": {
+    "decl": "Scenario: Single-pair pass and packed-neighbour pass produce bit-exact results for the same pair routed either way",
+    "file": "forces/jit-composed-pair-force",
+    "refs": [],
+    "title": "Single-pair pass and packed-neighbour pass produce bit-exact results for the same pair routed either way",
     "type": "scenario"
   },
   "rq-f1b57184": {
@@ -25897,12 +26370,7 @@
   "rq-f2e4b0b8": {
     "decl": "Scenario: Cell-list scratch is reallocated alongside cell_offsets on box generation refresh",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Cell-list scratch is reallocated alongside cell_offsets on box generation refresh",
     "type": "scenario"
   },
@@ -25944,6 +26412,13 @@
       }
     ],
     "title": "Angle wings are canonicalised so atom_i < atom_k",
+    "type": "scenario"
+  },
+  "rq-f34a4f43": {
+    "decl": "Scenario: Single-pair kernel observes the same _f/_fev convention",
+    "file": "forces/pair-force-kernel",
+    "refs": [],
+    "title": "Single-pair kernel observes the same _f/_fev convention",
     "type": "scenario"
   },
   "rq-f357fe5a": {
@@ -26100,14 +26575,6 @@
     ],
     "title": "Load a valid minimal analysis file with implicit pairing",
     "type": "scenario"
-  },
-  "rq-f5522d5f": {
-    "decl": "## Newton's Third Law",
-    "file": "forces/pair-force-kernel",
-    "level": 2,
-    "refs": [],
-    "title": "Newton's Third Law",
-    "type": "section"
   },
   "rq-f5984310": {
     "decl": "## Feature API",
@@ -26386,12 +26853,7 @@
   "rq-f79d1ac5": {
     "decl": "Scenario: Generation tick with unchanged n_cells_total still triggers rebuild when displacement exceeds threshold",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Generation tick with unchanged n_cells_total still triggers rebuild when displacement exceeds threshold",
     "type": "scenario"
   },
@@ -26507,12 +26969,7 @@
   "rq-f8ad62d4": {
     "decl": "Scenario: cell_offsets is the exclusive prefix sum and ends at particle_count",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "cell_offsets is the exclusive prefix sum and ends at particle_count",
     "type": "scenario"
   },
@@ -26558,12 +27015,7 @@
   "rq-f94ee5cd": {
     "decl": "Scenario: Displacement check returns the maximum across all particles",
     "file": "forces/neighbor-list",
-    "refs": [
-      {
-        "file": "tests/neighbor_list.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "Displacement check returns the maximum across all particles",
     "type": "scenario"
   },
@@ -26610,6 +27062,13 @@
     "refs": [],
     "title": "Parameters",
     "type": "section"
+  },
+  "rq-f9e0aa11": {
+    "decl": "Scenario: Two GPU runs produce byte-identical packed neighbour lists",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Two GPU runs produce byte-identical packed neighbour lists",
+    "type": "scenario"
   },
   "rq-f9ebe53f": {
     "decl": "- `log_column_values(ke, pe) -> vec![most_recent_pressure,",
@@ -26691,6 +27150,13 @@
       }
     ],
     "title": "Copy of a SimulationBox carries the original's generation",
+    "type": "scenario"
+  },
+  "rq-fb310fbe": {
+    "decl": "Scenario: Per-block SPC predicate is boundary-true at exactly MAX_CUTOFF margin",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "Per-block SPC predicate is boundary-true at exactly MAX_CUTOFF margin",
     "type": "scenario"
   },
   "rq-fb3f2189": {
@@ -27029,7 +27495,7 @@
     "type": "section"
   },
   "rq-fdc02bdb": {
-    "decl": "Scenario: charges round-trip through ParticleBuffers",
+    "decl": "Scenario: charges round-trip through ParticleBuffers via posq.w",
     "file": "particle-state",
     "refs": [
       {
@@ -27037,7 +27503,7 @@
         "kind": "code"
       }
     ],
-    "title": "charges round-trip through ParticleBuffers",
+    "title": "charges round-trip through ParticleBuffers via posq.w",
     "type": "scenario"
   },
   "rq-fdc545da": {
@@ -27114,6 +27580,13 @@
       }
     ],
     "title": "Load a topology file with one rigid-water constraint",
+    "type": "scenario"
+  },
+  "rq-fe6b054a": {
+    "decl": "Scenario: SPC predicate is uniform across the warp",
+    "file": "forces/packed-neighbour-pair-force",
+    "refs": [],
+    "title": "SPC predicate is uniform across the warp",
     "type": "scenario"
   },
   "rq-fe7f35cd": {
@@ -27211,12 +27684,7 @@
   "rq-fedef74d": {
     "decl": "Scenario: neighbor_list rejects zero max_neighbors",
     "file": "io/config-schema",
-    "refs": [
-      {
-        "file": "tests/io_config.rs",
-        "kind": "code"
-      }
-    ],
+    "refs": [],
     "title": "neighbor_list rejects zero max_neighbors",
     "type": "scenario"
   },
@@ -27326,6 +27794,14 @@
     ],
     "title": "angle_type unknown potential is rejected",
     "type": "scenario"
+  },
+  "rq-ffbee244": {
+    "decl": "## JIT Composer Integration",
+    "file": "forces/packed-neighbour-pair-force",
+    "level": 2,
+    "refs": [],
+    "title": "JIT Composer Integration",
+    "type": "section"
   },
   "rq-fff341e9": {
     "decl": "Scenario: Reject extra fields (e.g. collision_rate from Andersen)",

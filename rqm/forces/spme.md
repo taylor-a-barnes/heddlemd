@@ -47,11 +47,11 @@ SPME contributes two `Potential` slots to the `ForceField`:
   used by the spread and gather kernels. Unaffected by displacement;
   the reciprocal-space pipeline always runs separately.
 
-Both slots share the per-particle `charges` buffer on `ParticleBuffers`
-(see `particle-state.md`) and the shared `DeviceExclusionList` (see
-`topology.md`). The two slots are constructed together when `[spme]` is
-present in the config; they share the parsed `alpha` and per-particle
-charges but are otherwise independent.
+Both slots draw their per-particle charges from `posq.w` on
+`ParticleBuffers` (see `particle-state.md`) and share the
+`DeviceExclusionList` (see `topology.md`). The two slots are
+constructed together when `[spme]` is present in the config; they
+share the parsed `alpha` but are otherwise independent.
 
 The `[spme]` and `[coulomb]` tables are mutually exclusive in the config
 (see `io/config-schema.md`).
@@ -83,8 +83,8 @@ required when the table is present.
 The real-space slot is structurally analogous to `coulomb-pair-force.md`
 but evaluates `erfc(α · r) / r` instead of `1/r`. The slot uses the
 shared `NeighborListState` owned by `ForceField`, the per-particle
-`charges` buffer, and the shared `DeviceExclusionList`'s
-`atom_excl_coul_scales` array.
+charges carried in `posq.w` on `ParticleBuffers`, and the shared
+`DeviceExclusionList`'s `atom_excl_coul_scales` array.
 
 ### Algorithm <!-- rq-39b05bc9 -->
 
@@ -97,11 +97,13 @@ For lane `lane` of the warp handling particle `i` at sweep step `s`,
 when `k = s * 32 + lane` satisfies `k < neighbor_counts[i]` and
 `j = neighbor_list[i * max_neighbors + k]` is not equal to `i`:
 
-1. Compute the displacement `(dx, dy, dz) = positions[i] − positions[j]`
-   and apply the triclinic minimum-image algorithm of `simulation-box.md`.
+1. Load `posq[i]` and `posq[j]` (each as one 16-byte `Real4`
+   coalesced load). Compute the displacement
+   `(dx, dy, dz) = posq[i].xyz − posq[j].xyz` and apply the
+   triclinic minimum-image algorithm of `simulation-box.md`.
 2. Compute `r² = dx² + dy² + dz²`. If `r² > r_cut_real²`, the pair
    contributes nothing; the lane skips to its next assigned neighbour.
-3. Read `q_i = charges[i]`, `q_j = charges[j]`.
+3. Read `q_i = posq[i].w`, `q_j = posq[j].w`.
 4. Compute the screened Coulomb factor and energy:
 
    ```text
@@ -145,6 +147,66 @@ factor decays rapidly enough that a hard cutoff is acceptable when
 `α · r_cut_real >= 3.5` (the loader does not enforce this; it is a
 user-tuning concern documented in `io/config-schema.md`).
 
+### JIT fragment behaviour <!-- rq-27525d3c -->
+
+When `SpmeRealBuilder::pair_force_fragment(cx)` participates in the
+JIT-composed pair-force kernel (see `jit-composed-pair-force.md`),
+the fragment differs from the standalone kernel above in three
+ways:
+
+1. **Shared `(inv_r, r, qi, qj)` inputs.** The fragment's
+   `evaluate` signature is
+   `evaluate(Real r2, Real inv_r, Real r, Real qi, Real qj,
+   unsigned int i, unsigned int j, Real &factor, Real &energy,
+   Real &virial)`. `inv_r = rsqrtf(r²)`, `r = r² · inv_r`,
+   `qi = posq[i].w`, and `qj = posq[j].w` are computed once per
+   pair by the composer's outer loop and threaded into every
+   active fragment. The SPME-real fragment does not call
+   `Real_sqrt(r2)`, `1.0 / r2`, or `1.0 / inv_r`; it does not
+   read from a per-fragment `charges` array; it consumes the
+   composer-supplied scalars directly and derives
+   `inv_r2 = inv_r · inv_r` and `qq = qi · qj` from them.
+
+2. **Hastings polynomial for `erfc` in single precision.** Under
+   the f32 precision feature (the default), the fragment computes
+   `erfc(α · r)` inline via the 5-coefficient
+   Abramowitz–Stegun (1964) polynomial:
+
+   ```text
+   t           = 1.0 / (1.0 + 0.3275911 · α · r)
+   erfcAlphaR  = (0.254829592
+                 + (-0.284496736
+                    + (1.421413741
+                       + (-1.453152027
+                          + 1.061405429 · t) · t) · t) · t)
+                · t · expf(-(α · r)²)
+   ```
+
+   The polynomial has a maximum error of 1.5 × 10⁻⁷ over all real
+   `α · r`, which is below `f32` round-off and adequate for the
+   simulation's force/energy targets. Under the `--features f64`
+   build the fragment calls `Real_erfc(α · r)` (the precision-shim
+   dispatch to hardware `erfc`) instead, because the polynomial's
+   error floor is well above `f64` round-off and would inject
+   bias into double-precision runs.
+
+3. **CutoffHandling::Uniform.** The fragment reports
+   `cutoff: CutoffHandling::Uniform(r_cut_real)` to the composer.
+   The composer omits the per-fragment
+   `r² <= cutoff_squared(i, j)` guard for this fragment (the
+   outer max-cutoff mask described in
+   `jit-composed-pair-force.md` covers it). `evaluate` is invoked
+   unconditionally for every pair the outer loop visits; the
+   outer mask zeroes the contribution for `r² >
+   HEDDLE_JIT_MAX_CUTOFF_SQUARED`. The fragment is safe to call at
+   any positive `r²` because every intermediate (`α · r`,
+   `expf(-(α · r)²)`, the polynomial in `t`) is well-defined and
+   finite for any non-negative `r`.
+
+The standalone `spme_real_pair_force_*` kernels documented below
+keep the per-pair recipe in *Algorithm*; the JIT-fragment changes
+are scoped to the JIT path.
+
 ### Real-space CUDA kernels <!-- rq-9a512ed1 -->
 
 `kernels/spme_real.cu` declares two `extern "C"` kernels (forces-only
@@ -153,10 +215,7 @@ documented in `pair-force-kernel.md`:
 
 ```c
 extern "C" __global__ void spme_real_pair_force_f(
-    const float *positions_x,
-    const float *positions_y,
-    const float *positions_z,
-    const float *charges,
+    const float4 *posq,
     unsigned int max_neighbors,
     const float *lattice,           // length 6: [lx, ly, lz, xy, xz, yz]
     float k_coulomb,
@@ -173,10 +232,7 @@ extern "C" __global__ void spme_real_pair_force_f(
     unsigned int n);
 
 extern "C" __global__ void spme_real_pair_force_fev(
-    const float *positions_x,
-    const float *positions_y,
-    const float *positions_z,
-    const float *charges,
+    const float4 *posq,
     unsigned int max_neighbors,
     const float *lattice,           // length 6: [lx, ly, lz, xy, xz, yz]
     float k_coulomb,
@@ -309,9 +365,9 @@ The sorted order is materialised as a permutation
 `sorted_atom_index[t] = i` names the original atom index `i` to be
 processed at sorted slot `t`. Spread and gather kernels read this
 permutation with their block-id and use `i` to address
-`positions[i]`, `charges[i]`, and (for gather) the per-particle
-slot-output cells `slot_force_*[i]` / `slot_energy[i]` /
-`slot_virial[i]`.
+`posq[i]` (whose `.xyz` carries the position and `.w` the
+charge), and (for gather) the per-particle slot-output cells
+`slot_force_*[i]` / `slot_energy[i]` / `slot_virial[i]`.
 
 **Trigger protocol.** The sort runs at the start of every
 `SpmeReciprocalState::compute()` call where the framework's
@@ -404,40 +460,55 @@ The two stages:
    ordering supplies the read-after-write guarantee with no explicit
    synchronisation.
 
-2. **Per-particle fixed-point scatter.** `spme_spread_fixed_point`
-   runs one warp per sorted slot with 8 warps per block (256 threads)
-   and grid `ceil(N / 8)`. Lane 0 of each warp reads
-   `i = sorted_atom_index[t]` where `t` is the sorted slot for this
-   warp (`t = blockIdx.x · 8 + warp_id_in_block`), then reads
-   particle `i`'s wrapped position and charge `q_i`, computes the
-   fractional coordinates `(s_a, s_b, s_c)`, the primary bin
-   `(g_a, g_b, g_c)`, the fractional offsets `(t_a, t_b, t_c)`, and
-   the per-axis 1D B-spline weights `wa[0..p]`, `wb[0..p]`,
-   `wc[0..p]`; the per-axis weights, primary bin, and `q_i` are
-   broadcast to every lane via `__shfl_sync`. Consecutive sorted
-   slots address atoms with nearby primary bins, so the lane-stride
-   `atomicAdd<i64>` writes from consecutive warps cluster on
-   neighbouring `rho_fixed` cache lines.
+2. **Per-z-slice fixed-point scatter.** `spme_spread_fixed_point`
+   runs `p` threads per atom — one thread per z-slice of the
+   particle's `p × p × p` spline-support cube — with 256 threads
+   per block and grid `ceil(N · p / 256)`. Thread `gid =
+   blockIdx.x · 256 + threadIdx.x` handles z-slice
+   `iz = gid mod p` of sorted-slot `atom_slot = gid / p`. Each
+   thread is independent: no `__shfl_sync` broadcasts, no
+   `__syncwarp`, no per-warp coordination.
 
-   Each of the 32 lanes handles `⌈p³ / 32⌉` of the `p³` grid
-   contributions. Lane `l` iterates the contribution index
-   `k = l, l + 32, l + 64, …` while `k < p³`. For its assigned
-   `k = d_a · p² + d_b · p + d_c`, the lane:
-   - Computes the wrapped grid-cell index
-     `g = ((g_a + d_a) mod n_a · n_b + (g_b + d_b) mod n_b) · n_c
-          + (g_c + d_c) mod n_c`.
-   - Computes the f32 contribution value
-     `v = q_i · wa[d_a] · wb[d_b] · wc[d_c]`.
-   - Converts to fixed-point
-     `v_fixed = (i64) rintf(v · 2^32)` and issues
-     `atomicAdd(&rho_fixed[g], v_fixed)`.
+   For its assigned atom, the thread reads `i =
+   sorted_atom_index[atom_slot]`, then reads particle `i`'s charge
+   `q_i`. **Charge-zero skip:** if `q_i == 0`, the thread returns
+   immediately. Otherwise the thread reads `i`'s wrapped position,
+   computes the fractional coordinates `(s_a, s_b, s_c)`, the
+   primary bin `(g_a, g_b, g_c)`, the fractional offsets
+   `(t_a, t_b, t_c)`, the per-axis 1D B-spline weights `wa[0..p)`
+   and `wb[0..p)`, and the single z-slice weight
+   `wc_iz = M_p(iz + t_c)`. It then iterates the
+   `p · p` cells in this z-slice:
+
+   ```
+   gc = (g_c + n_c - iz) mod n_c
+   dz = q_i · wc_iz
+   for d_a in [0, p):
+     ga = (g_a + n_a - d_a) mod n_a
+     dz_da = dz · wa[d_a]
+     for d_b in [0, p):
+       v = dz_da · wb[d_b]
+       v_fixed = (i64) rintf(v · 2^32)
+       if v_fixed != 0:
+         gb = (g_b + n_b - d_b) mod n_b
+         g  = (ga · n_b + gb) · n_c + gc
+         atomicAdd(&rho_fixed[g], v_fixed)
+   ```
+
+   **Zero-skip guard.** The `v_fixed != 0` check elides the atomic
+   add for contributions whose round-to-nearest fixed-point value
+   is zero. At the edges of the spline support (where the per-axis
+   B-spline weight goes to zero) a meaningful fraction of the
+   `p^3` contributions per atom round to zero in `i64` fixed-point
+   and contribute nothing. The skip is bit-exact: zero is the
+   additive identity in the integer accumulator.
 
    Round-to-nearest in the f32 → i64 conversion (CUDA's
    `__float2ll_rn` or `rintf` + cast) keeps the per-contribution
    rounding direction deterministic. The atomic-completion order of
-   the `N · p³` adds is non-deterministic, but i64 addition is
-   associative, so the final `rho_fixed` is byte-identical across
-   runs.
+   the remaining (non-skipped) adds is non-deterministic, but `i64`
+   addition is associative, so the final `rho_fixed` is
+   byte-identical across runs with byte-identical inputs.
 
 3. **Fixed-point → f32 conversion.** `spme_spread_finish` runs one
    thread per grid cell with block size 256 and grid `ceil(M / 256)`.
@@ -820,11 +891,16 @@ only inside the `SpmeReciprocalState` construction path.
   default stream:
   1. Device-side `memset_zeros` on `spme_state.rho_fixed` (length
      `M`, i64) to clear the previous step's accumulation.
-  2. `spme_spread_fixed_point` — one warp per sorted slot. Lane 0
-     reads `i = sorted_atom_index[t]` to resolve the atom index
-     before reading the atom's position and charge; each lane
-     issues `⌈p³ / 32⌉` `atomicAdd<i64>` operations into
-     `rho_fixed`, totalling `N · p³` atomic adds per step.
+  2. `spme_spread_fixed_point` — `spline_order` threads per atom,
+     256 threads per block, grid `ceil(N · spline_order / 256)`.
+     Each thread owns one z-slice of its atom's `p³` spline
+     support and issues up to `p²` `atomicAdd<i64>` operations
+     against `rho_fixed`. Atoms with `charge == 0` are skipped
+     entirely; per-contribution `v_fixed != 0` guards elide
+     atomic-adds whose fixed-point conversion would round to
+     zero. The total upper-bound contribution count is
+     `N · p³`; the realised atomic-add count is the same minus
+     the zero-skipped contributions.
   3. `spme_spread_finish` — one thread per grid cell; converts
      `rho_fixed[c]` to `rho[c] = (f32) rho_fixed[c] · 2^-32`.
 
@@ -910,10 +986,7 @@ extern "C" __global__ void spme_recip_reduce_partials(
     float scale);                       // 0.5 / N
 
 extern "C" __global__ void spme_spread_fixed_point(
-    const float        *positions_x,
-    const float        *positions_y,
-    const float        *positions_z,
-    const float        *charges,
+    const float4       *posq,
     const unsigned int *sorted_atom_index,  // length n
     const float        *lattice,            // length 6
     unsigned int n_a, unsigned int n_b, unsigned int n_c,
@@ -927,9 +1000,7 @@ extern "C" __global__ void spme_spread_finish(
     unsigned int M);
 
 extern "C" __global__ void spme_compute_bin_key(
-    const float  *positions_x,
-    const float  *positions_y,
-    const float  *positions_z,
+    const float4 *posq,
     const float  *lattice,           // length 6
     unsigned int  n_a, unsigned int n_b, unsigned int n_c,
     unsigned int *atom_bin_key,      // length n
@@ -953,10 +1024,7 @@ extern "C" __global__ void spme_recip_apply_influence(
     unsigned int m_complex);
 
 extern "C" __global__ void spme_force_gather(
-    const float        *positions_x,
-    const float        *positions_y,
-    const float        *positions_z,
-    const float        *charges,
+    const float4       *posq,
     const float        *V,
     const unsigned int *sorted_atom_index,  // length n
     const float        *lattice,            // length 6
@@ -1302,6 +1370,49 @@ Feature: Smooth particle-mesh Ewald (SPME)
     When the _f variant of spme_real_pair_force is called
     Then slot_force_x[0] equals -slot_force_x[1] bit-exactly (Newton's third law for an isolated pair)
 
+  # --- JIT fragment behaviour ---
+
+  @rq-0f761603
+  Scenario: SPME-real JIT fragment uses the composer-supplied inv_r and r
+    Given a ForceField with [spme] configured and the JIT-composed kernel active
+    And the composed kernel source captured for inspection
+    Then the SPME-real fragment's evaluate signature is `evaluate(Real r2, Real inv_r, Real r, unsigned int i, unsigned int j, Real &factor, Real &energy, Real &virial)`
+    And the SPME-real fragment body does not contain any of: `Real_sqrt(`, `sqrt(r2)`, `sqrtf(r2)`, `1.0 / r2`, `1.0 / inv_r`
+
+  @rq-2a1f2043
+  Scenario: SPME-real JIT fragment evaluates erfc via the Hastings polynomial under f32
+    Given a heddle-md build with default features (precision = f32)
+    And a ForceField with [spme] configured and the JIT-composed kernel active
+    And the composed kernel source captured for inspection
+    Then the SPME-real fragment body contains the literal coefficient `0.254829592`
+    And the SPME-real fragment body contains the literal coefficient `0.3275911`
+    And the SPME-real fragment body does not contain `Real_erfc`
+
+  @rq-299ea1de
+  Scenario: SPME-real JIT fragment evaluates erfc via Real_erfc under f64
+    Given a heddle-md build with --features f64 (precision = f64)
+    And a ForceField with [spme] configured and the JIT-composed kernel active
+    And the composed kernel source captured for inspection
+    Then the SPME-real fragment body contains `Real_erfc(`
+    And the SPME-real fragment body does not contain the literal coefficient `0.254829592`
+
+  @rq-e4bd99f7
+  Scenario: SPME-real JIT fragment reports CutoffHandling::Uniform(r_cut_real)
+    Given any [spme] configuration with r_cut_real = c
+    When SpmeRealBuilder::pair_force_fragment(cx) is called
+    Then it returns Ok(Some(fragment)) with `fragment.cutoff == CutoffHandling::Uniform(c)`
+
+  @rq-0fb4e752
+  Scenario: SPME-real JIT fragment force matches the closed-form within 1e-5 under f32 (Hastings is accurate enough)
+    Given two unit-charge particles at separation r = 4.0e-10 inside the cutoff
+    And alpha = 2.0e10
+    And a ForceField with [spme] configured and the JIT-composed kernel active
+    When ForceField::step(...) is called
+    Then the per-particle force on particle 0 agrees with the closed-form
+      k_C · q_i · q_j · (erfc(α r) · inv_r2 + (2 α / √π) · exp(-α² r²) · inv_r2) · dx · inv_r
+      to within 1e-5 relative tolerance
+    And two runs of the same configuration produce byte-identical results on the same GPU
+
   # --- Reciprocal-space pipeline: atom spatial pre-sort ---
 
   @rq-0f592ab6
@@ -1416,11 +1527,22 @@ Feature: Smooth particle-mesh Ewald (SPME)
       `atomicAdd<i64>`
 
   @rq-3dc94856
-  Scenario: spme_spread_fixed_point issues exactly N · p³ atomicAdd<i64> operations
+  Scenario: spme_spread_fixed_point issues at most N · p³ atomicAdd<i64> operations
     Given N particles, spline order p, and an instrumented atomic counter
     When `spme_spread_fixed_point` runs
-    Then the device-side counter records exactly `N · p³` `atomicAdd<i64>`
-      invocations on `rho_fixed`
+    Then the device-side counter records at most `N · p³`
+      `atomicAdd<i64>` invocations on `rho_fixed`
+    And the count equals `N · p³` minus the number of contributions
+      whose round-to-nearest fixed-point value is zero (which the
+      kernel's `v_fixed != 0` guard elides)
+
+  @rq-8c630ad6
+  Scenario: Charge-zero atoms issue no atomicAdd<i64> against rho_fixed
+    Given N particles, one of which carries `charge == 0`
+    When `spme_spread_fixed_point` runs
+    Then the charge-zero atom's `spline_order` threads return
+      immediately and issue zero `atomicAdd<i64>` invocations on
+      `rho_fixed`
 
   @rq-6098e0c1
   Scenario: One particle's contribution at a single cell matches the fixed-point B-spline value

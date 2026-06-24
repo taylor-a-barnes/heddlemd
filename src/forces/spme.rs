@@ -27,7 +27,7 @@ use crate::timings::{KernelStage, Timings};
 use super::topology::{DeviceExclusionList, ExclusionList};
 use super::neighbor_list::{alloc_scan_block_totals, NeighborListError};
 use super::{
-    AggregateLevel, ForceFieldContext, ForceFieldError, PairForceBindContext,
+    AggregateLevel, CutoffHandling, ForceFieldContext, ForceFieldError, PairForceBindContext,
     PairForceFragment, PairForceLaunchBuilder, Potential, PotentialBuildContext,
     PotentialBuilder, SlotOutputView,
 };
@@ -566,10 +566,9 @@ impl Potential for SpmeRealSpaceState {
 
     fn bind_pair_force_args(
         &self,
-        ctx: &PairForceBindContext<'_>,
+        _ctx: &PairForceBindContext<'_>,
         builder: &mut PairForceLaunchBuilder,
     ) {
-        builder.push_device_buffer(&ctx.buffers.charges);
         builder.push_scalar(K_COULOMB_F32);
         builder.push_scalar(self.alpha);
         builder.push_scalar(self.r_cut_real);
@@ -581,10 +580,16 @@ impl Potential for SpmeRealSpaceState {
 
 /// SPME real-space `erfc`-screened pair force fragment for the
 /// JIT-composed pair-force kernel.
-pub fn spme_real_pair_force_fragment() -> PairForceFragment {
+pub fn spme_real_pair_force_fragment(r_cut_real: Real) -> PairForceFragment {
+    // Single functor source for both precisions. The `erfc` branch is
+    // selected at JIT-compile time via `HEDDLE_REAL_F64`:
+    //   - f32: 5-coefficient Hastings (Abramowitz & Stegun, 1964)
+    //     polynomial. Max error 1.5e-7 over all real α·r, below f32
+    //     round-off.
+    //   - f64: hardware `erfc` via the precision shim. The polynomial
+    //     would inject a 1.5e-7 bias well above f64 round-off.
     let functor_source = r#"
 struct SpmeRealPairFunctor {
-    const Real *charges;
     Real k_coulomb;
     Real alpha;
     Real r_cut_real;
@@ -597,18 +602,28 @@ struct SpmeRealPairFunctor {
     }
 
     __device__ inline void evaluate(
-        Real r2, unsigned int i, unsigned int j,
+        Real r2, Real inv_r, Real r,
+        Real qi, Real qj,
+        unsigned int i, unsigned int j,
         Real &factor, Real &energy, Real &virial) const
     {
-        Real qi = charges[i];
-        Real qj = charges[j];
         Real qq = qi * qj;
-        Real inv_r2 = R(1.0) / r2;
-        Real inv_r  = Real_sqrt(inv_r2);
-        Real r      = R(1.0) / inv_r;
+        Real inv_r2 = inv_r * inv_r;
         Real ar = alpha * r;
-        Real erfc_ar = Real_erfc(ar);
         Real gauss = Real_exp(-(ar * ar));
+        Real erfc_ar;
+#ifdef HEDDLE_REAL_F64
+        erfc_ar = Real_erfc(ar);
+#else
+        {
+            Real t = R(1.0) / (R(1.0) + R(0.3275911) * ar);
+            erfc_ar = (R(0.254829592)
+                       + (R(-0.284496736)
+                          + (R(1.421413741)
+                             + (R(-1.453152027) + R(1.061405429) * t) * t) * t) * t)
+                      * t * gauss;
+        }
+#endif
         Real one_over_sqrt_pi = R(0.5641895835477563);
         energy = k_coulomb * qq * erfc_ar * inv_r;
         factor = k_coulomb * qq * inv_r2
@@ -621,16 +636,14 @@ struct SpmeRealPairFunctor {
     }
 };
 "#;
-    let entry_point_args = r#"    const Real *spme_real_charges,
-    Real spme_real_k_coulomb,
+    let entry_point_args = r#"    Real spme_real_k_coulomb,
     Real spme_real_alpha,
     Real spme_real_r_cut,
     const unsigned int *spme_real_excl_offsets,
     const unsigned int *spme_real_excl_partners,
     const Real *spme_real_excl_scales,
 "#;
-    let functor_init_source = r#"    composite.functor_spme_real.charges = spme_real_charges;
-    composite.functor_spme_real.k_coulomb = spme_real_k_coulomb;
+    let functor_init_source = r#"    composite.functor_spme_real.k_coulomb = spme_real_k_coulomb;
     composite.functor_spme_real.alpha = spme_real_alpha;
     composite.functor_spme_real.r_cut_real = spme_real_r_cut;
     composite.functor_spme_real.excl_offsets = spme_real_excl_offsets;
@@ -643,6 +656,7 @@ struct SpmeRealPairFunctor {
         functor_source: functor_source.to_string(),
         entry_point_args: entry_point_args.to_string(),
         functor_init_source: functor_init_source.to_string(),
+        cutoff: CutoffHandling::Uniform(r_cut_real),
     }
 }
 
@@ -833,10 +847,11 @@ impl PotentialBuilder for SpmeRealBuilder {
         &self,
         cx: &PotentialBuildContext<'_>,
     ) -> Result<Option<PairForceFragment>, ForceFieldError> {
-        if cx.spme_config.is_none() {
+        let Some(spme_cfg) = cx.spme_config else {
             return Ok(None);
-        }
-        Ok(Some(spme_real_pair_force_fragment()))
+        };
+        let r_cut_real = spme_cfg.r_cut_real as Real;
+        Ok(Some(spme_real_pair_force_fragment(r_cut_real)))
     }
 }
 

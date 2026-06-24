@@ -184,8 +184,7 @@ extern "C" __global__ void spme_recip_compute_influence(
 // GPU regardless of atomic-completion order, so the accumulated
 // rho_fixed grid is byte-identical across runs with byte-identical
 // inputs. The f32 conversion is per-cell with no inter-thread
-// communication, also deterministic. The scale factor 2^32 matches
-// OpenMM's gridSpreadCharge convention.
+// communication, also deterministic.
 
 // Compute fractional offsets t_a, t_b, t_c and primary bin
 // (g_a, g_b, g_c) for one particle. Replicates the geometry of the
@@ -239,22 +238,23 @@ __device__ static inline void spread_per_particle_setup(
 }
 
 // Fixed-point scale factor: maps a real value `v` to the i64 integer
-// (i64) rintf(v * SPREAD_FIXED_POINT_SCALE). Matches OpenMM's
-// `gridSpreadCharge` convention. With charges bounded by O(1 e) and
-// B-spline weights bounded by 1, a single contribution maps to a
-// value of magnitude <= a few * 10^9; the worst-case accumulated
-// cell sum stays well under i64::MAX ~ 9.2 * 10^18.
+// (i64) rintf(v * SPREAD_FIXED_POINT_SCALE). With charges bounded by
+// O(1 e) and B-spline weights bounded by 1, a single contribution
+// maps to a value of magnitude <= a few * 10^9; the worst-case
+// accumulated cell sum stays well under i64::MAX ~ 9.2 * 10^18.
 #define SPREAD_FIXED_POINT_SCALE 4294967296.0f  // 2^32 as f32
 
-// Per-particle fixed-point spread. One warp per particle. Lane 0
-// computes the per-particle setup, broadcasts it via __shfl_sync,
-// and each lane handles ceil(p^3 / 32) of the p^3 contributions,
-// issuing atomicAdd<i64> into the fixed-point grid.
+// Per-particle fixed-point spread. PME_ORDER (= spline_order) threads
+// per atom, each thread owning one z-slice (`d_c = iz`) of the atom's
+// p^3 spline-support cube and running a tight nested loop over the
+// PME_ORDER * PME_ORDER = p^2 (d_a, d_b) cells in that slice. Each
+// (d_a, d_b, iz) contribution issues one atomicAdd<i64> into
+// rho_fixed, with a v_fixed != 0 zero-skip guard to elide the
+// contribution when the fixed-point quantisation rounds to zero
+// (matching OpenMM's gridSpreadCharge pattern). Grid:
+// ceil(N * spline_order / 256) blocks of 256 threads each.
 extern "C" __global__ void spme_spread_fixed_point(
-    const Real         *positions_x,
-    const Real         *positions_y,
-    const Real         *positions_z,
-    const Real         *charges,
+    const Real4        *posq,
     const unsigned int *sorted_atom_index, // length n
     const Real         *lattice,
     unsigned int        n_a, unsigned int n_b, unsigned int n_c,
@@ -262,74 +262,70 @@ extern "C" __global__ void spme_spread_fixed_point(
     long long          *rho_fixed,         // length M (i64)
     unsigned int        n)
 {
-  // 8 warps per block, 32 lanes per warp.
-  unsigned int warp_id_in_block = threadIdx.x >> 5;
-  unsigned int lane = threadIdx.x & 31u;
-  unsigned int t = blockIdx.x * 8u + warp_id_in_block;
-  if (t >= n) {
-    return;
-  }
-
-  Real lx = lattice[0]; Real ly = lattice[1]; Real lz = lattice[2];
-  Real xy = lattice[3]; Real xz = lattice[4]; Real yz = lattice[5];
   int p = (int) spline_order;
   unsigned int p_u = (unsigned int) p;
-  unsigned int p2 = p_u * p_u;
-  unsigned int p3 = p2 * p_u;
+  unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int total = n * p_u;
+  if (gid >= total) return;
 
-  // Lane 0 resolves the sorted-slot to its original atom index, then
-  // computes the per-particle weights and primary bin; the values are
-  // broadcast to every lane via warp shuffles.
+  unsigned int atom_slot = gid / p_u;
+  unsigned int iz = gid - atom_slot * p_u;          // z-slice for this thread
+  unsigned int atom = sorted_atom_index[atom_slot];
+
+  // One Real4 load carries position + charge in a single coalesced
+  // transaction.
+  Real4 pq = posq[atom];
+  Real qi = pq.w;
+
+  // Charge-zero skip — matches OpenMM. Atoms with q == 0 contribute
+  // nothing to the grid.
+  if (qi == R(0.0)) return;
+
+  Real px = pq.x;
+  Real py = pq.y;
+  Real pz = pq.z;
+  Real lx = lattice[0]; Real ly = lattice[1]; Real lz = lattice[2];
+  Real xy = lattice[3]; Real xz = lattice[4]; Real yz = lattice[5];
+
   Real ta = R(0.0), tb = R(0.0), tc = R(0.0);
   unsigned int g_a = 0u, g_b = 0u, g_c = 0u;
-  Real qi = R(0.0);
-  if (lane == 0u) {
-    unsigned int i = sorted_atom_index[t];
-    Real px = positions_x[i];
-    Real py = positions_y[i];
-    Real pz = positions_z[i];
-    spread_per_particle_setup(
-        px, py, pz, n_a, n_b, n_c, lx, ly, lz, xy, xz, yz,
-        ta, tb, tc, g_a, g_b, g_c);
-    qi = charges[i];
-  }
-  ta = __shfl_sync(0xffffffffu, ta, 0);
-  tb = __shfl_sync(0xffffffffu, tb, 0);
-  tc = __shfl_sync(0xffffffffu, tc, 0);
-  g_a = __shfl_sync(0xffffffffu, g_a, 0);
-  g_b = __shfl_sync(0xffffffffu, g_b, 0);
-  g_c = __shfl_sync(0xffffffffu, g_c, 0);
-  qi = __shfl_sync(0xffffffffu, qi, 0);
+  spread_per_particle_setup(
+      px, py, pz, n_a, n_b, n_c, lx, ly, lz, xy, xz, yz,
+      ta, tb, tc, g_a, g_b, g_c);
 
-  // Per-axis 1D B-spline weights wa[d], wb[d], wc[d] for d in [0, p).
-  // Each lane computes them all (cheap, ~p evaluations per axis = 12
-  // for p=4) so register pressure stays bounded.
-  Real wa[8], wb[8], wc[8];
+  // Per-axis 1D B-spline weights. This thread needs the full
+  // wa[0..p), wb[0..p) (for the nested (d_a, d_b) loop) plus
+  // wc[iz] only (its assigned z-slice).
+  Real wa[8], wb[8];
   for (int d = 0; d < p; ++d) {
     wa[d] = bspline_weight(p, (Real) d + ta);
     wb[d] = bspline_weight(p, (Real) d + tb);
-    wc[d] = bspline_weight(p, (Real) d + tc);
   }
+  Real wc_iz = bspline_weight(p, (Real) iz + tc);
 
-  // Each lane handles ceil(p^3 / 32) entries. For p=4 -> 64 entries
-  // -> 2 per lane; for p=5 -> 125 entries -> 4 per lane (p<=8).
-  // Inverse mapping: the original one-thread-per-grid-cell kernel
-  // summed over contributing bins (g + d) % n; so a particle in bin
-  // b contributes to grid cells (b - d) % n for d in [0, p).
-  for (unsigned int k = lane; k < p3; k += 32u) {
-    unsigned int da = k / p2;
-    unsigned int rem = k - da * p2;
-    unsigned int db = rem / p_u;
-    unsigned int dc = rem - db * p_u;
+  // Inverse mapping: a particle at primary bin (g_a, g_b, g_c)
+  // contributes to grid cells ((g - d) mod n) for d in [0, p).
+  unsigned int gc = (g_c + n_c - iz) % n_c;
+  Real dz = qi * wc_iz;
+
+  // Tight (d_a, d_b) loop: PME_ORDER * PME_ORDER = 16 cells for p = 4.
+  for (unsigned int da = 0; da < p_u; ++da) {
     unsigned int ga = (g_a + n_a - da) % n_a;
-    unsigned int gb = (g_b + n_b - db) % n_b;
-    unsigned int gc = (g_c + n_c - dc) % n_c;
-    unsigned int g = (ga * n_b + gb) * n_c + gc;
-    Real v = qi * wa[da] * wb[db] * wc[dc];
-    long long v_fixed = (long long) __float2ll_rn(
-        (float) v * SPREAD_FIXED_POINT_SCALE);
-    atomicAdd((unsigned long long *) &rho_fixed[g],
-              (unsigned long long) v_fixed);
+    Real dzda = dz * wa[da];
+    for (unsigned int db = 0; db < p_u; ++db) {
+      Real v = dzda * wb[db];
+      long long v_fixed = (long long) __float2ll_rn(
+          (float) v * SPREAD_FIXED_POINT_SCALE);
+      // Zero-skip: contributions whose round-to-nearest fixed-point
+      // value is zero contribute nothing to the i64 sum and can be
+      // elided without changing the grid bit-pattern.
+      if (v_fixed != 0LL) {
+        unsigned int gb = (g_b + n_b - db) % n_b;
+        unsigned int g = (ga * n_b + gb) * n_c + gc;
+        atomicAdd((unsigned long long *) &rho_fixed[g],
+                  (unsigned long long) v_fixed);
+      }
+    }
   }
 }
 
@@ -347,9 +343,7 @@ extern "C" __global__ void spme_spread_fixed_point(
 // deterministic across runs. The caller is responsible for zeroing
 // `bin_atom_counts` (length M) before this kernel launches.
 extern "C" __global__ void spme_compute_bin_key(
-    const Real   *positions_x,
-    const Real   *positions_y,
-    const Real   *positions_z,
+    const Real4  *posq,
     const Real   *lattice,
     unsigned int  n_a, unsigned int n_b, unsigned int n_c,
     unsigned int *atom_bin_key,
@@ -362,9 +356,10 @@ extern "C" __global__ void spme_compute_bin_key(
   }
   Real lx = lattice[0]; Real ly = lattice[1]; Real lz = lattice[2];
   Real xy = lattice[3]; Real xz = lattice[4]; Real yz = lattice[5];
-  Real px = positions_x[i];
-  Real py = positions_y[i];
-  Real pz = positions_z[i];
+  Real4 pq = posq[i];
+  Real px = pq.x;
+  Real py = pq.y;
+  Real pz = pq.z;
   Real ta, tb, tc;
   unsigned int g_a, g_b, g_c;
   spread_per_particle_setup(
@@ -568,10 +563,7 @@ extern "C" __global__ void spme_recip_reduce_partials(
 }
 
 extern "C" __global__ void spme_force_gather(
-    const Real         *positions_x,
-    const Real         *positions_y,
-    const Real         *positions_z,
-    const Real         *charges,
+    const Real4        *posq,
     const Real         *V,
     const Real         *u_self_per_particle,
     const Real         *w_per_particle_virial,   // length 1
@@ -599,10 +591,11 @@ extern "C" __global__ void spme_force_gather(
   // canonical particle-index positions slot_*[i], preserving the
   // slot-output layout regardless of the sort permutation.
   unsigned int i = sorted_atom_index[t];
-  Real qi = charges[i];
-  Real px = positions_x[i];
-  Real py = positions_y[i];
-  Real pz = positions_z[i];
+  Real4 pq = posq[i];
+  Real qi = pq.w;
+  Real px = pq.x;
+  Real py = pq.y;
+  Real pz = pq.z;
 
   // Re-wrap defensively, matching the spread kernel.
   int wrap_a, wrap_b, wrap_c;
